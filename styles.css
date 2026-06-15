@@ -1,0 +1,290 @@
+:root {
+    --color-primary: #1f5fa8;
+    --color-primary-dark: #154a85;
+    --color-bg: #f4f6f9;
+    --color-card: #ffffff;
+    --color-border: #d7dde5;
+    --color-text: #1c2733;
+    --color-muted: #6b7785;
+    --color-error: #c0392b;
+    --color-error-bg: #fdecea;
+    --color-success: #1e7e34;
+    --radius: 8px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    font-family: "Segoe UI", Arial, sans-serif;
+    background: var(--color-bg);
+    color: var(--color-text);
+}
+
+header.topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--color-primary);
+    color: #fff;
+    padding: 12px 20px;
+}
+
+header.topbar h1 {
+    font-size: 18px;
+    margin: 0;
+    font-weight: 600;
+}
+
+header.topbar .user-info {
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+header.topbar button {
+    background: rgba(255,255,255,0.15);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.4);
+}
+
+main {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.card {
+    background: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.card h2 {
+    margin-top: 0;
+    font-size: 18px;
+}
+
+.card h3 {
+    font-size: 15px;
+    margin-bottom: 8px;
+}
+
+.hidden { display: none !important; }
+
+/* Login */
+#login-view {
+    max-width: 380px;
+    margin: 80px auto;
+}
+
+#login-view .card {
+    text-align: center;
+}
+
+#login-view label, .form-grid label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: var(--color-muted);
+}
+
+input, select, textarea {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    font-size: 14px;
+    font-family: inherit;
+    background: #fff;
+    color: var(--color-text);
+}
+
+input.invalid, select.invalid {
+    border-color: var(--color-error);
+    background: var(--color-error-bg);
+}
+
+textarea { resize: vertical; }
+
+button {
+    cursor: pointer;
+    border: 1px solid var(--color-primary);
+    background: var(--color-primary);
+    color: #fff;
+    padding: 9px 16px;
+    border-radius: var(--radius);
+    font-size: 14px;
+    font-weight: 600;
+}
+
+button:hover { background: var(--color-primary-dark); }
+
+button.secondary {
+    background: #fff;
+    color: var(--color-primary);
+}
+
+button.secondary:hover { background: #eef3fa; }
+
+button.danger {
+    background: #fff;
+    color: var(--color-error);
+    border-color: var(--color-error);
+    padding: 4px 9px;
+    font-size: 13px;
+}
+
+button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Výber firmy / šablóny - dlaždice */
+.tile-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+}
+
+.tile {
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius);
+    background: #fff;
+    padding: 18px 12px;
+    text-align: center;
+    cursor: pointer;
+    font-weight: 600;
+    transition: border-color .15s, background .15s;
+}
+
+.tile:hover { border-color: var(--color-primary); }
+
+.tile.selected {
+    border-color: var(--color-primary);
+    background: #eef3fa;
+}
+
+.tile small {
+    display: block;
+    font-weight: 400;
+    color: var(--color-muted);
+    margin-top: 4px;
+}
+
+/* Formulár objednávky */
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+}
+
+.form-grid .full { grid-column: 1 / -1; }
+
+.field-error {
+    color: var(--color-error);
+    font-size: 12px;
+    margin-top: 3px;
+    min-height: 14px;
+}
+
+/* Tabuľka položiek */
+table.items {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 6px;
+}
+
+table.items th, table.items td {
+    border: 1px solid var(--color-border);
+    padding: 6px;
+    font-size: 13px;
+    text-align: left;
+}
+
+table.items th {
+    background: #f0f3f7;
+}
+
+table.items input {
+    border: none;
+    padding: 4px;
+    font-size: 13px;
+}
+
+table.items td.total-cell {
+    text-align: right;
+    white-space: nowrap;
+    font-weight: 600;
+}
+
+.items-total-row td {
+    font-weight: 700;
+    text-align: right;
+    background: #f0f3f7;
+}
+
+.payment-options label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 400;
+    margin-right: 14px;
+    color: var(--color-text);
+}
+
+.payment-options input { width: auto; }
+
+/* Banner so chybou / úspechom */
+.banner {
+    padding: 10px 14px;
+    border-radius: var(--radius);
+    margin-bottom: 14px;
+    font-size: 14px;
+}
+
+.banner.error {
+    background: var(--color-error-bg);
+    color: var(--color-error);
+    border: 1px solid #f3c3bd;
+}
+
+.banner.success {
+    background: #e9f7ee;
+    color: var(--color-success);
+    border: 1px solid #bfe6cc;
+    font-size: 18px;
+    font-weight: 700;
+    text-align: center;
+}
+
+.actions {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 16px;
+    gap: 10px;
+}
+
+.actions .right { display: flex; gap: 10px; }
+
+/* Tlačová verzia */
+#print-area { display: none; }
+
+@media print {
+    header.topbar, .no-print { display: none !important; }
+    body * { visibility: hidden; }
+    #print-area, #print-area * { visibility: visible; }
+    #print-area {
+        display: block;
+        position: absolute;
+        left: 0; top: 0; width: 100%;
+    }
+    #print-area table { width: 100%; border-collapse: collapse; }
+    #print-area th, #print-area td {
+        border: 1px solid #444; padding: 4px 6px; font-size: 12px;
+    }
+}
