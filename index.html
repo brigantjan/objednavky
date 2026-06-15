@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SUPTel - Objednávkový systém</title>
+<link rel="stylesheet" href="css/styles.css" />
+
+<!-- Supabase klient -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- SheetJS na export do Excelu -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+<script src="js/config.js?v=2"></script>
+</head>
+<body>
+
+<!-- ============================ PRIHLÁSENIE ============================ -->
+<div id="login-view">
+    <div class="card">
+        <h2>SUPTel - Objednávkový systém</h2>
+        <div id="login-error" class="banner error hidden"></div>
+        <form id="login-form">
+            <label for="login-email">E-mail</label>
+            <input type="email" id="login-email" required autocomplete="username" />
+            <br /><br />
+            <label for="login-password">Heslo</label>
+            <input type="password" id="login-password" required autocomplete="current-password" />
+            <br /><br />
+            <button type="submit" id="login-button">Prihlásiť sa</button>
+        </form>
+    </div>
+</div>
+
+<!-- ============================== APLIKÁCIA ============================== -->
+<div id="app-view" class="hidden">
+    <header class="topbar">
+        <h1>SUPTel - Objednávkový systém</h1>
+        <div class="user-info">
+            <span id="user-name"></span>
+            <button id="logout-button">Odhlásiť sa</button>
+        </div>
+    </header>
+
+    <main>
+        <div id="global-error" class="banner error hidden"></div>
+
+        <!-- Krok 1: výber firmy -->
+        <section class="card" id="step-company">
+            <h2>1. Vyberte firmu</h2>
+            <div class="tile-grid" id="company-tiles"></div>
+        </section>
+
+        <!-- Krok 2: výber šablóny -->
+        <section class="card hidden" id="step-template">
+            <h2>2. Vyberte typ objednávky</h2>
+            <div class="tile-grid" id="template-tiles"></div>
+        </section>
+
+        <!-- Krok 3: formulár objednávky -->
+        <section class="card hidden" id="step-form">
+            <h2>3. Vyplňte objednávku</h2>
+            <form id="order-form">
+
+                <div class="form-grid">
+                    <div class="full">
+                        <label for="zakazka-input">Interná zákazka *</label>
+                        <input list="zakazky-list" id="zakazka-input" placeholder="Začnite písať číslo alebo názov zákazky..." autocomplete="off" />
+                        <datalist id="zakazky-list"></datalist>
+                        <div class="field-error" id="err-zakazka"></div>
+                    </div>
+
+                    <div class="full">
+                        <label for="supplier-input">Dodávateľ *</label>
+                        <input list="suppliers-list" id="supplier-input" placeholder="Začnite písať názov alebo IČO dodávateľa..." autocomplete="off" />
+                        <datalist id="suppliers-list"></datalist>
+                        <div class="field-error" id="err-supplier"></div>
+                        <label style="margin-top:6px;">
+                            <input type="checkbox" id="new-supplier-toggle" style="width:auto;" />
+                            Dodávateľ nie je v zozname - zadať nového
+                        </label>
+                    </div>
+
+                    <!-- Formulár nového dodávateľa -->
+                    <div class="full hidden" id="new-supplier-fields">
+                        <div class="form-grid">
+                            <div><label>Názov *</label><input id="ns-name" /></div>
+                            <div><label>IČO *</label><input id="ns-ico" /></div>
+                            <div><label>Adresa *</label><input id="ns-address" /></div>
+                            <div><label>PSČ</label><input id="ns-zip" /></div>
+                            <div><label>Mesto *</label><input id="ns-city" /></div>
+                            <div><label>DIČ</label><input id="ns-dic" /></div>
+                            <div><label>Kontaktná osoba (Vybavuje)</label><input id="ns-contact" /></div>
+                            <div><label>Telefón</label><input id="ns-phone" /></div>
+                        </div>
+                        <div class="field-error" id="err-new-supplier"></div>
+                    </div>
+                </div>
+
+                <hr />
+
+                <div class="form-grid">
+                    <div class="full">
+                        <label for="intro-text">Text "Objednávame si u Vás:"</label>
+                        <textarea id="intro-text" rows="3"></textarea>
+                    </div>
+
+                    <div class="full hidden" id="billing-note-wrap">
+                        <label for="billing-note">Text o fakturácii</label>
+                        <textarea id="billing-note" rows="2"></textarea>
+                    </div>
+
+                    <div class="full hidden" id="attachment-note-wrap">
+                        <label for="attachment-note">Prílohy</label>
+                        <input id="attachment-note" />
+                    </div>
+                </div>
+
+                <hr />
+
+                <h3>Položky objednávky</h3>
+                <table class="items" id="items-table">
+                    <thead>
+                        <tr id="items-head"></tr>
+                    </thead>
+                    <tbody id="items-body"></tbody>
+                    <tfoot>
+                        <tr class="items-total-row" id="items-total-row">
+                            <td id="items-total-label" colspan="4">CELKEM</td>
+                            <td id="items-total-value">0,00 €</td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+                <div class="field-error" id="err-items"></div>
+                <button type="button" class="secondary" id="add-item-button" style="margin-top:8px;">+ Pridať položku</button>
+
+                <hr />
+
+                <div class="form-grid">
+                    <div>
+                        <label for="delivery-date">Dátum dodania</label>
+                        <input type="date" id="delivery-date" />
+                        <div class="field-error" id="err-delivery-date"></div>
+                    </div>
+
+                    <div>
+                        <label>Spôsob platby *</label>
+                        <div class="payment-options">
+                            <label><input type="radio" name="payment" value="ucet" checked /> Na účet</label>
+                            <label><input type="radio" name="payment" value="hotovost" /> Hotovosť</label>
+                            <label><input type="radio" name="payment" value="kreditka" /> Kreditná karta</label>
+                            <label><input type="radio" name="payment" value="sekom" /> Šekom</label>
+                        </div>
+                    </div>
+
+                    <div><label for="doprava">Doprava</label><input id="doprava" /></div>
+                    <div><label for="sprava">Správa</label><input id="sprava" /></div>
+
+                    <div class="full">
+                        <label for="note">Poznámky / pripomienky</label>
+                        <textarea id="note" rows="2"></textarea>
+                    </div>
+                </div>
+
+                <div class="actions">
+                    <button type="button" class="secondary" id="back-to-template-button">&larr; Späť na výber typu</button>
+                    <button type="submit" id="submit-order-button">Vystaviť objednávku</button>
+                </div>
+            </form>
+        </section>
+
+        <!-- Krok 4: výsledok -->
+        <section class="card hidden" id="step-result">
+            <div class="banner success" id="result-banner"></div>
+            <div class="actions">
+                <button class="secondary" id="export-excel-button">Stiahnuť Excel</button>
+                <button class="secondary" id="print-button">Tlač / PDF</button>
+                <button id="new-order-button">Nová objednávka</button>
+            </div>
+        </section>
+    </main>
+</div>
+
+<!-- ============================ TLAČOVÁ VERZIA ============================ -->
+<div id="print-area"></div>
+
+<script src="js/app.js?v=2"></script>
+</body>
+</html>
