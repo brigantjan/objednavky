@@ -87,32 +87,6 @@ td.total-cell{text-align:right;font-weight:600;white-space:nowrap;}
 .detail-grid .val{font-weight:500;}
 
 #print-area{display:none;}
-@media print{
-  header.topbar,.sidebar,.no-print{display:none!important;}
-  body *{visibility:hidden;}
-  #print-area,#print-area *{visibility:visible;}
-  #print-area{display:block!important;position:absolute;left:0;top:0;width:100%;font-family:"Calibri",Arial,sans-serif;font-size:11px;padding:10mm;}
-  .ph{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;}
-  .pc{font-size:10px;line-height:1.4;}
-  .pt{font-size:22px;font-weight:bold;font-style:italic;text-align:center;margin:6px 0;}
-  .pon{font-size:11px;font-weight:bold;text-align:right;}
-  .pp{display:grid;grid-template-columns:1fr 1fr;border:1px solid #000;margin:4px 0;}
-  .pp-side{padding:5px;}
-  .pp-side h4{font-size:10px;font-weight:bold;background:#d9d9d9;padding:2px 4px;margin:-5px -5px 5px;}
-  .pp-side p{font-size:10px;line-height:1.5;margin:0;}
-  .pz{font-size:11px;font-weight:bold;margin:4px 0;}
-  .pi{width:100%;border-collapse:collapse;margin:4px 0;}
-  .pi th,.pi td{border:1px solid #000;padding:3px 5px;font-size:10px;}
-  .pi th{background:#d9d9d9;font-weight:bold;}
-  .pr{text-align:right;}
-  .ptot{font-weight:bold;background:#d9d9d9;}
-  .pbot{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px;}
-  .pib{border:1px solid #000;padding:5px;font-size:10px;line-height:1.6;}
-  .papr{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px;}
-  .papr-box{border:1px solid #000;min-height:45px;padding:4px;font-size:10px;}
-  .papr-box h4{font-weight:bold;margin-bottom:3px;}
-  .pnotes{border:1px solid #000;min-height:35px;padding:4px;margin-top:5px;font-size:10px;}
-}
 </style>
 </head>
 <body>
@@ -765,7 +739,7 @@ el('result-new-btn').addEventListener('click',()=>{
 });
 
 // ── EXCEL EXPORT ─────────────────────────────────────────────────────────
-async function exportExcel(order, items) {
+async function buildXlsx(order, items) {
   const comp=S.companies.find(c=>c.code===order.company_code)||{};
   const sup=order.supplier_snapshot||{};
   const tpl=S.templates.find(t=>t.code===order.template_code)||{};
@@ -825,7 +799,13 @@ async function exportExcel(order, items) {
 
   let r=19; ws.getRow(r).height=14;
   M(r,4,r,6); SC(r,4,'Zákazka č.:',{bold:true});
-  M(r,7,r,11); SC(r,7,order.zakazka_cislo,{b:true});
+  // Zákazka cislo - bold, viditeľná, bez mriežky (čistý štýl)
+  M(r,7,r,11);
+  const zc=ws.getCell(r,7);
+  zc.value=order.zakazka_cislo;
+  zc.font={name:'Calibri',size:11,bold:true};
+  zc.alignment={horizontal:'left',vertical:'center'};
+  zc.border=B();
 
   r=20; ws.getRow(r).height=16;
   if(tpl.show_quantity_columns){
@@ -837,10 +817,12 @@ async function exportExcel(order, items) {
     M(r,4,r,17); SC(r,4,'Popis',{bold:true,b:true,h:'center'});
   }
 
-  r=21; ws.getRow(r).height=14;
-  const ilines=(order.intro_text||'').split('\n');
+  // Intro text riadky - rámik len ak majú obsah
+  r=21;
+  const ilines=(order.intro_text||'').split('\n').filter(l=>l.trim());
   ilines.forEach((line,li)=>{
     if(li>0){r++;ws.getRow(r).height=14;}
+    ws.getRow(r).height=14;
     if(tpl.show_quantity_columns){
       SC(r,4,null,{b:true}); SC(r,5,null,{b:true});
       M(r,6,r,13); SC(r,6,line,{bold:li===0,b:true});
@@ -850,6 +832,7 @@ async function exportExcel(order, items) {
     }
   });
 
+  // Položky - rámik len na riadkoch s obsahom
   items.forEach(it=>{
     r++; ws.getRow(r).height=14;
     if(tpl.show_quantity_columns){
@@ -863,17 +846,12 @@ async function exportExcel(order, items) {
     }
   });
 
-  while(r<38){
-    r++; ws.getRow(r).height=14;
-    if(tpl.show_quantity_columns){
-      SC(r,4,null,{b:true}); SC(r,5,null,{b:true});
-      M(r,6,r,13); SC(r,6,null,{b:true});
-      M(r,14,r,16); SC(r,14,null,{b:true}); SC(r,17,null,{b:true});
-    } else { M(r,4,r,17); SC(r,4,null,{b:true}); }
-  }
+  // Prázdny oddeľovací riadok (bez mriežky)
+  r++; ws.getRow(r).height=8;
 
+  // Billing note - len ak existuje
   if(order.billing_note){
-    order.billing_note.split('\n').forEach(line=>{
+    order.billing_note.split('\n').filter(l=>l.trim()).forEach(line=>{
       r++; ws.getRow(r).height=14;
       if(tpl.show_quantity_columns){
         SC(r,4,null,{b:true}); SC(r,5,null,{b:true});
@@ -883,6 +861,7 @@ async function exportExcel(order, items) {
     });
   }
 
+  // Adresa faktúry
   [
     [true,'Faktúru pošlite na adresu:'],
     [true,comp.name+', '+comp.address+', '+comp.zip+' '+comp.city],
@@ -891,27 +870,27 @@ async function exportExcel(order, items) {
   ].forEach(([bold,txt])=>{
     r++; ws.getRow(r).height=14;
     if(tpl.show_quantity_columns){
-      SC(r,4,null,{b:true}); SC(r,5,null,{b:true});
-      M(r,6,r,13); SC(r,6,txt,{bold,b:true});
-      M(r,14,r,16); SC(r,14,null,{b:true}); SC(r,17,null,{b:true});
-    } else { M(r,4,r,17); SC(r,4,txt,{bold,b:true}); }
+      SC(r,4,null); SC(r,5,null);
+      M(r,6,r,13); SC(r,6,txt,{bold});
+      M(r,14,r,16); SC(r,14,null);
+    } else { M(r,4,r,17); SC(r,4,txt,{bold}); }
   });
 
   if(order.attachment_note){
     r++; ws.getRow(r).height=14;
     if(tpl.show_quantity_columns){
-      SC(r,4,null,{b:true}); SC(r,5,null,{b:true});
-      M(r,6,r,13); SC(r,6,'Prílohy: '+order.attachment_note,{b:true});
-      M(r,14,r,16); SC(r,14,null,{b:true}); SC(r,17,null,{b:true});
-    } else { M(r,4,r,17); SC(r,4,'Prílohy: '+order.attachment_note,{b:true}); }
+      M(r,6,r,13); SC(r,6,'Prílohy: '+order.attachment_note);
+    } else { M(r,4,r,17); SC(r,4,'Prílohy: '+order.attachment_note); }
   }
 
+  // CELKEM
   if(tpl.show_quantity_columns){
-    r++; ws.getRow(r).height=16;
+    r+=1; ws.getRow(r).height=16;
     M(r,14,r,16); SC(r,14,'CELKEM',{bold:true,h:'right',f:'FFD9D9D9'});
     SC(r,17,Number(order.total_amount),{bold:true,h:'right',b:true,f:'FFD9D9D9',n:'#,##0.00 €'});
   }
 
+  // Platba
   r+=2; ws.getRow(r).height=14;
   M(r,4,r,8); SC(r,4,'Podrobnosti platby',{bold:true});
   const ppm=order.payment_method;
@@ -934,9 +913,11 @@ async function exportExcel(order, items) {
   M(r,5,r,8); SC(r,5,'Kód banky / Platí do');
   M(r,10,r,12); SC(r,10,comp.bank_name||'',{b:true});
 
+  // Oddeľovač
   r+=2; ws.getRow(r).height=6;
   M(r,2,r,17); ws.getCell(r,2).border={top:ME};
 
+  // Schválenie
   r++; ws.getRow(r).height=14;
   M(r,2,r,11); SC(r,2,'Schválenie',{bold:true});
   const ar=r;
@@ -951,6 +932,7 @@ async function exportExcel(order, items) {
     M(ir+i,15,ir+i,17); SC(ir+i,15,v,{b:true});
   });
 
+  // Poznámky
   r++; ws.getRow(r).height=14;
   M(r,2,r,17); SC(r,2,'Poznámky / pripomienky',{bold:true});
   for(let i=0;i<3;i++){
@@ -962,73 +944,139 @@ async function exportExcel(order, items) {
   }
 
   const buf=await wb.xlsx.writeBuffer();
-  const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob); a.download='Objednavka_'+order.order_number.replace(/\//g,'-')+'.xlsx'; a.click();
+  return buf;
 }
 
-// ── PRINT ─────────────────────────────────────────────────────────────────
-function printOrder(order, items) {
+// exportExcel - stiahne xlsx
+async function exportExcel(order, items) {
+  const buf=await buildXlsx(order,items);
+  const comp=S.companies.find(c=>c.code===order.company_code)||{};
+  const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='Objednavka_'+order.order_number.replace(/\//g,'-')+'.xlsx';
+  a.click();
+}
+
+// printOrder - rovnaký xlsx, otvorí sa v novom okne a vytlačí
+async function printOrder(order, items) {
+  const buf=await buildXlsx(order,items);
+  // Otvorí xlsx ako blob URL - prehliadač ho stiahne a užívateľ ho otvorí v Exceli / LibreOffice a vytlačí
+  // Alternatíva: stiahni ako PDF cez tlačové CSS (render do iframe)
+  // Použijeme HTML render (identický layout) v iframe a window.print()
   const comp=S.companies.find(c=>c.code===order.company_code)||{};
   const sup=order.supplier_snapshot||{};
   const tpl=S.templates.find(t=>t.code===order.template_code)||{};
+
   let iHtml='';
   if(tpl.show_quantity_columns){
-    iHtml=`<table class="pi"><thead><tr><th>Počet</th><th>Jedn.</th><th>Popis</th><th class="pr">Cena za jedn.</th><th class="pr">CELKEM</th></tr></thead><tbody>`
-      +items.map(i=>`<tr><td>${i.quantity??''}</td><td>${esc(i.unit||'')}</td><td>${esc(i.description)}</td>
-        <td class="pr">${i.unit_price!=null?fmt(i.unit_price):''}</td><td class="pr">${i.line_total!=null?fmt(i.line_total):''}</td></tr>`).join('')
-      +`<tr><td colspan="4" class="ptot pr">CELKEM</td><td class="ptot pr">${fmt(order.total_amount)}</td></tr></tbody></table>`;
+    iHtml=`<table class="pi"><thead><tr>
+      <th style="width:60px">Počet</th><th style="width:50px">Jedn.</th>
+      <th>Popis</th><th style="width:110px;text-align:right">Cena za jedn.</th>
+      <th style="width:90px;text-align:right">CELKEM</th></tr></thead><tbody>`
+      +items.map(it=>`<tr>
+        <td style="text-align:right">${it.quantity??''}</td>
+        <td style="text-align:center">${esc(it.unit||'')}</td>
+        <td>${esc(it.description)}</td>
+        <td style="text-align:right">${it.unit_price!=null?fmt(it.unit_price):''}</td>
+        <td style="text-align:right;font-weight:600">${it.line_total!=null?fmt(it.line_total):''}</td></tr>`).join('')
+      +`<tr style="background:#d9d9d9;font-weight:bold">
+        <td colspan="4" style="text-align:right">CELKEM</td>
+        <td style="text-align:right">${fmt(order.total_amount)}</td></tr></tbody></table>`;
   } else {
     iHtml=`<table class="pi"><thead><tr><th>Popis</th></tr></thead><tbody>`
-      +items.map(i=>`<tr><td>${esc(i.description)}</td></tr>`).join('')+'</tbody></table>';
+      +items.map(it=>`<tr><td>${esc(it.description)}</td></tr>`).join('')+'</tbody></table>';
   }
-  el('print-area').innerHTML=`
-    <div class="ph">
-      <div style="display:flex;gap:10px;align-items:flex-start;">
-        <img src="data:image/png;base64,${LOGO_B64}" style="height:50px;"/>
-        <div class="pc"><strong style="font-size:14px;">${esc(comp.name)}</strong><br/>
-        ${esc(comp.address)}, ${esc(comp.zip)} ${esc(comp.city)}<br/>
-        IČO: ${esc(comp.ico)} &nbsp; DIČ: ${esc(comp.dic)}<br/>${esc(comp.email)}</div>
-      </div>
-      <div class="pon">Objednávka č. ${esc(order.order_number)}</div>
+
+  const introText=esc(order.intro_text||'').replace(/\n/g,'<br/>');
+  const html=`<!DOCTYPE html><html lang="sk"><head><meta charset="UTF-8"/>
+<title>Objednávka ${esc(order.order_number)}</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:Calibri,Arial,sans-serif;font-size:11px;padding:12mm 15mm;}
+.hdr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;}
+.co{font-size:10px;line-height:1.5;}
+.on{font-size:11px;font-weight:bold;text-align:right;}
+.title{font-size:22px;font-weight:bold;font-style:italic;text-align:center;margin:6px 0 8px;}
+.parties{display:grid;grid-template-columns:1fr 1fr;border:1px solid #000;margin:4px 0 6px;}
+.party{padding:5px 7px;}
+.party h4{font-size:10px;font-weight:bold;background:#d9d9d9;padding:2px 5px;margin:-5px -7px 5px;}
+.party p{font-size:10px;line-height:1.55;}
+.zakazka{font-size:11px;font-weight:bold;margin:4px 0 6px;}
+.intro{font-size:11px;font-weight:bold;margin:3px 0 5px;}
+.pi{width:100%;border-collapse:collapse;margin:4px 0 6px;}
+.pi th,.pi td{border:1px solid #000;padding:3px 5px;font-size:10px;}
+.pi th{background:#d9d9d9;font-weight:bold;}
+.note-text{font-size:10px;margin:3px 0;}
+.bottom{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px;}
+.pay-box{font-size:10px;line-height:1.7;}
+.info-box{border:1px solid #000;padding:6px;font-size:10px;line-height:1.7;}
+.sep{border-top:2px solid #000;margin:8px 0 4px;}
+.appr{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:4px;}
+.appr-box{border:1px solid #000;min-height:45px;padding:5px;font-size:10px;}
+.appr-box h4{font-weight:bold;margin-bottom:3px;}
+.notes-box{border:1px solid #000;min-height:30px;padding:5px;margin-top:5px;font-size:10px;}
+@media print{@page{size:A4;margin:10mm 15mm;} body{padding:0;}}
+</style></head><body>
+<div class="hdr">
+  <div style="display:flex;gap:10px;align-items:flex-start">
+    <img src="data:image/png;base64,${LOGO_B64}" style="height:52px;"/>
+    <div class="co">
+      <strong style="font-size:14px">${esc(comp.name)}</strong><br/>
+      ${esc(comp.address)}, ${esc(comp.zip)} ${esc(comp.city)}<br/>
+      tel. +421 244 451 339 &nbsp; mail: ${esc(comp.email)}<br/>
+      IČO: ${esc(comp.ico)} &nbsp; DIČ: ${esc(comp.dic)}
     </div>
-    <div class="pt">OBJEDNÁVKA</div>
-    <div class="pp">
-      <div class="pp-side"><h4>Dodávateľ</h4><p>
-        ${esc(sup.name)}<br/>${esc(sup.address)}<br/>${esc(sup.zip||'')} ${esc(sup.city||'')}<br/>
-        Vybavuje: ${esc(sup.contact_person||'')}<br/>Tel.: ${esc(sup.phone||'')}<br/>
-        IČO: ${esc(sup.ico||'')} &nbsp; DIČ: ${esc(sup.dic||'')}</p></div>
-      <div class="pp-side"><h4>Odberateľ</h4><p>
-        ${esc(comp.name)}<br/>${esc(comp.address)}<br/>${esc(comp.zip)} ${esc(comp.city)}<br/>
-        Vybavuje: ${esc(S.profile.full_name)}<br/>Tel.: ${esc(S.profile.phone||'')}<br/>
-        IČO: ${esc(comp.ico)} &nbsp; DIČ: ${esc(comp.dic)}</p></div>
-    </div>
-    <div class="pz">Zákazka č.: ${esc(order.zakazka_cislo)}</div>
-    <p style="font-size:11px;font-weight:bold;margin:3px 0;">${esc(order.intro_text||'').replace(/\n/g,'<br/>')}</p>
-    ${iHtml}
-    ${order.billing_note?`<p style="font-size:10px;margin:3px 0;">${esc(order.billing_note).replace(/\n/g,'<br/>')}</p>`:''}
-    <p style="font-size:10px;margin:3px 0;"><strong>Faktúru pošlite na adresu:</strong><br/>
-    ${esc(comp.name)}, ${esc(comp.address)}, ${esc(comp.zip)} ${esc(comp.city)}<br/>
-    ${esc(comp.email)}<br/>Splatnosť faktúry: ${comp.invoice_due_days||45} dní od dodania</p>
-    ${order.attachment_note?`<p style="font-size:10px;"><strong>Prílohy:</strong> ${esc(order.attachment_note)}</p>`:''}
-    <div class="pbot">
-      <div class="pib"><strong>Podrobnosti platby:</strong><br/>
-        ${['sekom','hotovost','kreditka','ucet'].map(c=>(c===order.payment_method?'● ':'○ ')+(PM[c]||c)).join('<br/>')}<br/>
-        Číslo účtu: ${esc(comp.bank_account||'')}<br/>Kód banky: ${esc(comp.bank_name||'')}</div>
-      <div class="pib">
-        <strong>Dátum dodania:</strong> ${esc(order.delivery_date||'—')}<br/>
-        <strong>Dátum vystavenia:</strong> ${esc(order.order_date||'')}<br/>
-        <strong>Objedn. č.:</strong> ${esc(order.order_number)}<br/>
-        <strong>Správa:</strong> ${esc(order.sprava||'')}<br/>
-        <strong>Doprava:</strong> ${esc(order.doprava||'')}
-      </div>
-    </div>
-    <div class="papr">
-      <div class="papr-box"><h4>Schválenie</h4></div>
-      <div></div>
-    </div>
-    ${order.note?`<div class="pnotes"><strong>Poznámky:</strong> ${esc(order.note)}</div>`:''}`;
-  window.print();
+  </div>
+  <div class="on">Objednávka č. ${esc(order.order_number)}</div>
+</div>
+<div class="title">OBJEDNÁVKA</div>
+<div class="parties">
+  <div class="party"><h4>Dodávateľ</h4><p>
+    ${esc(sup.name)}<br/>${esc(sup.address)}<br/>${esc(sup.zip||'')} ${esc(sup.city||'')}<br/>
+    Vybavuje: ${esc(sup.contact_person||'—')}<br/>Telefón: ${esc(sup.phone||'—')}<br/>
+    IČO: ${esc(sup.ico||'')} &nbsp; DIČ: ${esc(sup.dic||'')}
+  </p></div>
+  <div class="party"><h4>Odberateľ</h4><p>
+    ${esc(comp.name)}<br/>${esc(comp.address)}<br/>${esc(comp.zip)} ${esc(comp.city)}<br/>
+    Vybavuje: ${esc(S.profile.full_name)}<br/>Telefón: ${esc(S.profile.phone||'—')}<br/>
+    IČO: ${esc(comp.ico)} &nbsp; DIČ: ${esc(comp.dic)}
+  </p></div>
+</div>
+<div class="zakazka">Zákazka č.: ${esc(order.zakazka_cislo)}</div>
+<div class="intro">${introText}</div>
+${iHtml}
+${order.billing_note?`<p class="note-text">${esc(order.billing_note).replace(/\n/g,'<br/>')}</p>`:''}
+<p class="note-text"><strong>Faktúru pošlite na adresu:</strong><br/>
+${esc(comp.name)}, ${esc(comp.address)}, ${esc(comp.zip)} ${esc(comp.city)}<br/>
+${esc(comp.email)}<br/>Splatnosť faktúry: ${comp.invoice_due_days||45} dní od dodania</p>
+${order.attachment_note?`<p class="note-text"><strong>Prílohy:</strong> ${esc(order.attachment_note)}</p>`:''}
+<div class="bottom">
+  <div class="pay-box">
+    <strong>Podrobnosti platby</strong><br/>
+    ${['sekom','hotovost','kreditka','ucet'].map(c=>(c===order.payment_method?'● ':'○ ')+(PM[c]||c)).join('<br/>')}<br/>
+    Číslo účtu: ${esc(comp.bank_account||'')}<br/>
+    Kód banky / Platí do: ${esc(comp.bank_name||'')}
+  </div>
+  <div class="info-box">
+    <strong>Dátum dodania:</strong> ${esc(order.delivery_date||'—')}<br/>
+    <strong>Dátum vystavenia:</strong> ${esc(order.order_date||'')}<br/>
+    <strong>Objedn. č.:</strong> ${esc(order.order_number)}<br/>
+    <strong>Správa:</strong> ${esc(order.sprava||'')}<br/>
+    <strong>Doprava:</strong> ${esc(order.doprava||'')}
+  </div>
+</div>
+<div class="sep"></div>
+<div class="appr">
+  <div class="appr-box"><h4>Schválenie</h4></div>
+  <div></div>
+</div>
+${order.note?`<div class="notes-box"><strong>Poznámky / pripomienky:</strong><br/>${esc(order.note)}</div>`:'<div class="notes-box"><strong>Poznámky / pripomienky</strong></div>'}
+<script>window.onload=function(){window.print();}<\/script>
+</body></html>`;
+
+  const w=window.open('','_blank','width=900,height=700');
+  if(w){ w.document.write(html); w.document.close(); }
 }
 
 checkSession();
