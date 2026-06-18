@@ -1,1340 +1,1037 @@
 <!DOCTYPE html>
 <html lang="sk">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>SUPTel - Objednávkový systém</title>
-<style>
-:root {
-    --color-primary: #1f5fa8;
-    --color-primary-dark: #154a85;
-    --color-bg: #f4f6f9;
-    --color-card: #ffffff;
-    --color-border: #d7dde5;
-    --color-text: #1c2733;
-    --color-muted: #6b7785;
-    --color-error: #c0392b;
-    --color-error-bg: #fdecea;
-    --color-success: #1e7e34;
-    --radius: 8px;
-}
-
-* { box-sizing: border-box; }
-
-body {
-    margin: 0;
-    font-family: "Segoe UI", Arial, sans-serif;
-    background: var(--color-bg);
-    color: var(--color-text);
-}
-
-header.topbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: var(--color-primary);
-    color: #fff;
-    padding: 12px 20px;
-}
-
-header.topbar h1 {
-    font-size: 18px;
-    margin: 0;
-    font-weight: 600;
-}
-
-header.topbar .user-info {
-    font-size: 14px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-header.topbar button {
-    background: rgba(255,255,255,0.15);
-    color: #fff;
-    border: 1px solid rgba(255,255,255,0.4);
-}
-
-main {
-    max-width: 980px;
-    margin: 0 auto;
-    padding: 20px;
-}
-
-.card {
-    background: var(--color-card);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
-    padding: 20px;
-    margin-bottom: 20px;
-}
-
-.card h2 {
-    margin-top: 0;
-    font-size: 18px;
-}
-
-.card h3 {
-    font-size: 15px;
-    margin-bottom: 8px;
-}
-
-.hidden { display: none !important; }
-
-/* Login */
-#login-view {
-    max-width: 380px;
-    margin: 80px auto;
-}
-
-#login-view .card {
-    text-align: center;
-}
-
-#login-view label, .form-grid label {
-    display: block;
-    font-size: 13px;
-    font-weight: 600;
-    margin-bottom: 4px;
-    color: var(--color-muted);
-}
-
-input, select, textarea {
-    width: 100%;
-    padding: 8px 10px;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
-    font-size: 14px;
-    font-family: inherit;
-    background: #fff;
-    color: var(--color-text);
-}
-
-input.invalid, select.invalid {
-    border-color: var(--color-error);
-    background: var(--color-error-bg);
-}
-
-textarea { resize: vertical; }
-
-button {
-    cursor: pointer;
-    border: 1px solid var(--color-primary);
-    background: var(--color-primary);
-    color: #fff;
-    padding: 9px 16px;
-    border-radius: var(--radius);
-    font-size: 14px;
-    font-weight: 600;
-}
-
-button:hover { background: var(--color-primary-dark); }
-
-button.secondary {
-    background: #fff;
-    color: var(--color-primary);
-}
-
-button.secondary:hover { background: #eef3fa; }
-
-button.danger {
-    background: #fff;
-    color: var(--color-error);
-    border-color: var(--color-error);
-    padding: 4px 9px;
-    font-size: 13px;
-}
-
-button:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-/* Výber firmy / šablóny - dlaždice */
-.tile-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: 12px;
-}
-
-.tile {
-    border: 2px solid var(--color-border);
-    border-radius: var(--radius);
-    background: #fff;
-    padding: 18px 12px;
-    text-align: center;
-    cursor: pointer;
-    font-weight: 600;
-    transition: border-color .15s, background .15s;
-}
-
-.tile:hover { border-color: var(--color-primary); }
-
-.tile.selected {
-    border-color: var(--color-primary);
-    background: #eef3fa;
-}
-
-.tile small {
-    display: block;
-    font-weight: 400;
-    color: var(--color-muted);
-    margin-top: 4px;
-}
-
-/* Formulár objednávky */
-.form-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 14px;
-}
-
-.form-grid .full { grid-column: 1 / -1; }
-
-.field-error {
-    color: var(--color-error);
-    font-size: 12px;
-    margin-top: 3px;
-    min-height: 14px;
-}
-
-/* Tabuľka položiek */
-table.items {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 6px;
-}
-
-table.items th, table.items td {
-    border: 1px solid var(--color-border);
-    padding: 6px;
-    font-size: 13px;
-    text-align: left;
-}
-
-table.items th {
-    background: #f0f3f7;
-}
-
-table.items input {
-    border: none;
-    padding: 4px;
-    font-size: 13px;
-}
-
-table.items td.total-cell {
-    text-align: right;
-    white-space: nowrap;
-    font-weight: 600;
-}
-
-.items-total-row td {
-    font-weight: 700;
-    text-align: right;
-    background: #f0f3f7;
-}
-
-.payment-options label {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-weight: 400;
-    margin-right: 14px;
-    color: var(--color-text);
-}
-
-.payment-options input { width: auto; }
-
-/* Banner so chybou / úspechom */
-.banner {
-    padding: 10px 14px;
-    border-radius: var(--radius);
-    margin-bottom: 14px;
-    font-size: 14px;
-}
-
-.banner.error {
-    background: var(--color-error-bg);
-    color: var(--color-error);
-    border: 1px solid #f3c3bd;
-}
-
-.banner.success {
-    background: #e9f7ee;
-    color: var(--color-success);
-    border: 1px solid #bfe6cc;
-    font-size: 18px;
-    font-weight: 700;
-    text-align: center;
-}
-
-.actions {
-    display: flex;
-    justify-content: space-between;
-    margin-top: 16px;
-    gap: 10px;
-}
-
-.actions .right { display: flex; gap: 10px; }
-
-/* Tlačová verzia */
-#print-area { display: none; }
-
-@media print {
-    header.topbar, .no-print { display: none !important; }
-    body * { visibility: hidden; }
-    #print-area, #print-area * { visibility: visible; }
-    #print-area {
-        display: block;
-        position: absolute;
-        left: 0; top: 0; width: 100%;
-    }
-    #print-area table { width: 100%; border-collapse: collapse; }
-    #print-area th, #print-area td {
-        border: 1px solid #444; padding: 4px 6px; font-size: 12px;
-    }
-}
-
-</style>
-
-<!-- Supabase klient -->
+<script src="exceljs.bare.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<!-- SheetJS na export do Excelu -->
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script></head>
+<style>
+:root{
+  --primary:#1f5fa8;--primary-dark:#154a85;--bg:#f4f6f9;
+  --card:#fff;--border:#d7dde5;--text:#1c2733;--muted:#6b7785;
+  --error:#c0392b;--error-bg:#fdecea;--success:#1e7e34;--radius:8px;
+  --sidebar:280px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Segoe UI",Arial,sans-serif;background:var(--bg);color:var(--text);display:flex;flex-direction:column;height:100vh;overflow:hidden;}
+header.topbar{display:flex;align-items:center;justify-content:space-between;background:var(--primary);color:#fff;padding:10px 16px;flex-shrink:0;}
+header.topbar h1{font-size:16px;font-weight:600;}
+header.topbar .user-info{font-size:13px;display:flex;align-items:center;gap:10px;}
+.layout{display:flex;flex:1;overflow:hidden;}
+
+.sidebar{width:var(--sidebar);background:#fff;border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;}
+.sidebar-header{padding:10px 12px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:6px;}
+.sidebar-header h3{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;}
+.sidebar-search{width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;}
+.sidebar-list{flex:1;overflow-y:auto;}
+.order-item{padding:9px 12px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s;}
+.order-item:hover{background:#f0f5ff;}
+.order-item.active{background:#e0ebff;border-left:3px solid var(--primary);}
+.order-item .oi-num{font-weight:700;font-size:13px;color:var(--primary);}
+.order-item .oi-sup{font-size:12px;color:var(--text);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.order-item .oi-date{font-size:11px;color:var(--muted);margin-top:1px;}
+.new-order-btn{margin:10px 12px;padding:8px;background:var(--primary);color:#fff;border:none;border-radius:var(--radius);font-size:13px;font-weight:600;cursor:pointer;text-align:center;}
+.new-order-btn:hover{background:var(--primary-dark);}
+
+.main-content{flex:1;overflow-y:auto;padding:16px;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:14px;}
+.card h2{font-size:16px;margin-bottom:12px;}
+.hidden{display:none!important;}
+
+#login-view{max-width:360px;margin:80px auto;}
+#login-view .card{text-align:center;}
+
+label{display:block;font-size:12px;font-weight:600;margin-bottom:3px;color:var(--muted);margin-top:10px;}
+input,select,textarea{width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;font-family:inherit;background:#fff;color:var(--text);}
+input.invalid{border-color:var(--error);background:var(--error-bg);}
+textarea{resize:vertical;}
+
+button{cursor:pointer;border:1px solid var(--primary);background:var(--primary);color:#fff;padding:8px 14px;border-radius:var(--radius);font-size:13px;font-weight:600;}
+button:hover{background:var(--primary-dark);}
+button.secondary{background:#fff;color:var(--primary);}
+button.secondary:hover{background:#eef3fa;}
+button.danger{background:#fff;color:var(--error);border-color:var(--error);padding:3px 8px;font-size:12px;}
+button:disabled{opacity:.5;cursor:not-allowed;}
+
+.tile-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;}
+.tile{border:2px solid var(--border);border-radius:var(--radius);background:#fff;padding:14px 10px;text-align:center;cursor:pointer;font-weight:600;font-size:13px;transition:border-color .15s,background .15s;}
+.tile:hover{border-color:var(--primary);}
+.tile.selected{border-color:var(--primary);background:#eef3fa;}
+
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.form-grid .full{grid-column:1/-1;}
+.field-error{color:var(--error);font-size:11px;margin-top:2px;min-height:13px;}
+
+table.items{width:100%;border-collapse:collapse;margin-top:4px;font-size:13px;}
+table.items th,table.items td{border:1px solid var(--border);padding:5px;text-align:left;}
+table.items th{background:#f0f3f7;font-size:12px;}
+table.items input{border:none;padding:3px;font-size:12px;}
+td.total-cell{text-align:right;font-weight:600;white-space:nowrap;}
+.items-total-row td{font-weight:700;text-align:right;background:#f0f3f7;}
+
+.payment-options label{display:inline-flex;align-items:center;gap:5px;font-weight:400;margin-right:12px;color:var(--text);font-size:13px;margin-top:4px;}
+.payment-options input{width:auto;}
+
+.banner{padding:9px 12px;border-radius:var(--radius);margin-bottom:12px;font-size:13px;}
+.banner.error{background:var(--error-bg);color:var(--error);border:1px solid #f3c3bd;}
+.banner.success{background:#e9f7ee;color:var(--success);border:1px solid #bfe6cc;font-size:16px;font-weight:700;text-align:center;padding:16px;}
+
+.actions{display:flex;justify-content:space-between;margin-top:14px;gap:8px;flex-wrap:wrap;}
+.actions .right{display:flex;gap:8px;}
+
+.order-detail-header{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;}
+.order-detail-header h2{margin-bottom:0;}
+.detail-grid{display:grid;grid-template-columns:auto 1fr;gap:4px 16px;font-size:13px;margin:12px 0;}
+.detail-grid .lbl{color:var(--muted);font-size:12px;white-space:nowrap;}
+.detail-grid .val{font-weight:500;}
+
+#print-area{display:none;}
+@media print{
+  header.topbar,.sidebar,.no-print{display:none!important;}
+  body *{visibility:hidden;}
+  #print-area,#print-area *{visibility:visible;}
+  #print-area{display:block!important;position:absolute;left:0;top:0;width:100%;font-family:"Calibri",Arial,sans-serif;font-size:11px;padding:10mm;}
+  .ph{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;}
+  .pc{font-size:10px;line-height:1.4;}
+  .pt{font-size:22px;font-weight:bold;font-style:italic;text-align:center;margin:6px 0;}
+  .pon{font-size:11px;font-weight:bold;text-align:right;}
+  .pp{display:grid;grid-template-columns:1fr 1fr;border:1px solid #000;margin:4px 0;}
+  .pp-side{padding:5px;}
+  .pp-side h4{font-size:10px;font-weight:bold;background:#d9d9d9;padding:2px 4px;margin:-5px -5px 5px;}
+  .pp-side p{font-size:10px;line-height:1.5;margin:0;}
+  .pz{font-size:11px;font-weight:bold;margin:4px 0;}
+  .pi{width:100%;border-collapse:collapse;margin:4px 0;}
+  .pi th,.pi td{border:1px solid #000;padding:3px 5px;font-size:10px;}
+  .pi th{background:#d9d9d9;font-weight:bold;}
+  .pr{text-align:right;}
+  .ptot{font-weight:bold;background:#d9d9d9;}
+  .pbot{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px;}
+  .pib{border:1px solid #000;padding:5px;font-size:10px;line-height:1.6;}
+  .papr{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px;}
+  .papr-box{border:1px solid #000;min-height:45px;padding:4px;font-size:10px;}
+  .papr-box h4{font-weight:bold;margin-bottom:3px;}
+  .pnotes{border:1px solid #000;min-height:35px;padding:4px;margin-top:5px;font-size:10px;}
+}
+</style>
+</head>
 <body>
 
-<!-- ============================ PRIHLÁSENIE ============================ -->
 <div id="login-view">
-    <div class="card">
-        <h2>SUPTel - Objednávkový systém</h2>
-        <div id="login-error" class="banner error hidden"></div>
-        <form id="login-form">
-            <label for="login-email">E-mail</label>
-            <input type="email" id="login-email" required autocomplete="username" />
-            <br /><br />
-            <label for="login-password">Heslo</label>
-            <input type="password" id="login-password" required autocomplete="current-password" />
-            <br /><br />
-            <button type="submit" id="login-button">Prihlásiť sa</button>
-        </form>
+  <div class="card">
+    <h2 style="margin-bottom:16px;">SUPTel – Objednávkový systém</h2>
+    <div id="login-error" class="banner error hidden"></div>
+    <form id="login-form">
+      <label>E-mail</label>
+      <input type="email" id="login-email" required autocomplete="username"/>
+      <label>Heslo</label>
+      <input type="password" id="login-password" required autocomplete="current-password"/>
+      <br/><br/>
+      <button type="submit" id="login-btn" style="width:100%;">Prihlásiť sa</button>
+    </form>
+  </div>
+</div>
+
+<div id="app-view" class="hidden" style="display:flex;flex-direction:column;height:100%;">
+  <header class="topbar">
+    <h1>SUPTel – Objednávkový systém</h1>
+    <div class="user-info">
+      <span id="user-name"></span>
+      <button id="logout-btn" style="padding:5px 10px;font-size:12px;">Odhlásiť sa</button>
     </div>
-</div>
+  </header>
+  <div class="layout">
 
-<!-- ============================== APLIKÁCIA ============================== -->
-<div id="app-view" class="hidden">
-    <header class="topbar">
-        <h1>SUPTel - Objednávkový systém</h1>
-        <div class="user-info">
-            <span id="user-name"></span>
-            <button id="logout-button">Odhlásiť sa</button>
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <h3>Vystavené objednávky</h3>
+        <input class="sidebar-search" id="sidebar-search" placeholder="Číslo / dodávateľ / zákazka..." type="search"/>
+      </div>
+      <div class="sidebar-list" id="sidebar-list">
+        <div style="padding:20px;text-align:center;color:var(--muted);font-size:13px;">Načítavam...</div>
+      </div>
+      <button class="new-order-btn" id="new-order-btn">+ Nová objednávka</button>
+    </aside>
+
+    <div class="main-content" id="main-content">
+      <div id="global-error" class="banner error hidden"></div>
+
+      <!-- DETAIL -->
+      <section class="card hidden" id="view-order">
+        <div class="order-detail-header">
+          <h2 id="view-title"></h2>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="secondary" id="view-excel-btn">⬇ Excel</button>
+            <button class="secondary" id="view-print-btn">🖨 Tlač</button>
+            <button id="view-clone-btn">📋 Použiť ako šablónu</button>
+          </div>
         </div>
-    </header>
+        <div class="detail-grid" id="view-grid"></div>
+        <table class="items" id="view-items" style="margin-top:10px;"></table>
+      </section>
 
-    <main>
-        <div id="global-error" class="banner error hidden"></div>
+      <!-- KROK 1 -->
+      <section class="card" id="step-company">
+        <h2>1. Vyberte firmu</h2>
+        <div class="tile-grid" id="company-tiles"></div>
+      </section>
 
-        <!-- Krok 1: výber firmy -->
-        <section class="card" id="step-company">
-            <h2>1. Vyberte firmu</h2>
-            <div class="tile-grid" id="company-tiles"></div>
-        </section>
+      <!-- KROK 2 -->
+      <section class="card hidden" id="step-template">
+        <h2>2. Vyberte typ objednávky</h2>
+        <div class="tile-grid" id="template-tiles"></div>
+      </section>
 
-        <!-- Krok 2: výber šablóny -->
-        <section class="card hidden" id="step-template">
-            <h2>2. Vyberte typ objednávky</h2>
-            <div class="tile-grid" id="template-tiles"></div>
-        </section>
+      <!-- KROK 3 -->
+      <section class="card hidden" id="step-form">
+        <h2>3. Vyplňte objednávku</h2>
+        <div id="form-error" class="banner error hidden"></div>
+        <form id="order-form">
+          <div class="form-grid">
 
-        <!-- Krok 3: formulár objednávky -->
-        <section class="card hidden" id="step-form">
-            <h2>3. Vyplňte objednávku</h2>
-            <form id="order-form">
-
-                <div class="form-grid">
-                    <div class="full">
-                        <label for="zakazka-input">Interná zákazka *</label>
-                        <input list="zakazky-list" id="zakazka-input" placeholder="Začnite písať číslo alebo názov zákazky..." autocomplete="off" />
-                        <datalist id="zakazky-list"></datalist>
-                        <div class="field-error" id="err-zakazka"></div>
-                    </div>
-
-                    <div class="full">
-                        <label for="supplier-input">Dodávateľ *</label>
-                        <input list="suppliers-list" id="supplier-input" placeholder="Začnite písať názov alebo IČO dodávateľa..." autocomplete="off" />
-                        <datalist id="suppliers-list"></datalist>
-                        <div class="field-error" id="err-supplier"></div>
-                        <label style="margin-top:6px;">
-                            <input type="checkbox" id="new-supplier-toggle" style="width:auto;" />
-                            Dodávateľ nie je v zozname - zadať nového
-                        </label>
-                    </div>
-
-                    <!-- Formulár nového dodávateľa -->
-                    <div class="full hidden" id="new-supplier-fields">
-                        <div class="form-grid">
-                            <div><label>Názov *</label><input id="ns-name" /></div>
-                            <div><label>IČO *</label><input id="ns-ico" /></div>
-                            <div><label>Adresa *</label><input id="ns-address" /></div>
-                            <div><label>PSČ</label><input id="ns-zip" /></div>
-                            <div><label>Mesto *</label><input id="ns-city" /></div>
-                            <div><label>DIČ</label><input id="ns-dic" /></div>
-                            <div><label>Kontaktná osoba (Vybavuje)</label><input id="ns-contact" /></div>
-                            <div><label>Telefón</label><input id="ns-phone" /></div>
-                        </div>
-                        <div class="field-error" id="err-new-supplier"></div>
-                    </div>
-                </div>
-
-                <hr />
-
-                <div class="form-grid">
-                    <div class="full">
-                        <label for="intro-text">Text "Objednávame si u Vás:"</label>
-                        <textarea id="intro-text" rows="3"></textarea>
-                    </div>
-
-                    <div class="full hidden" id="billing-note-wrap">
-                        <label for="billing-note">Text o fakturácii</label>
-                        <textarea id="billing-note" rows="2"></textarea>
-                    </div>
-
-                    <div class="full hidden" id="attachment-note-wrap">
-                        <label for="attachment-note">Prílohy</label>
-                        <input id="attachment-note" />
-                    </div>
-                </div>
-
-                <hr />
-
-                <h3>Položky objednávky</h3>
-                <table class="items" id="items-table">
-                    <thead>
-                        <tr id="items-head"></tr>
-                    </thead>
-                    <tbody id="items-body"></tbody>
-                    <tfoot>
-                        <tr class="items-total-row" id="items-total-row">
-                            <td id="items-total-label" colspan="4">CELKEM</td>
-                            <td id="items-total-value">0,00 €</td>
-                            <td></td>
-                        </tr>
-                    </tfoot>
-                </table>
-                <div class="field-error" id="err-items"></div>
-                <button type="button" class="secondary" id="add-item-button" style="margin-top:8px;">+ Pridať položku</button>
-
-                <hr />
-
-                <div class="form-grid">
-                    <div>
-                        <label for="delivery-date">Dátum dodania</label>
-                        <input type="date" id="delivery-date" />
-                        <div class="field-error" id="err-delivery-date"></div>
-                    </div>
-
-                    <div>
-                        <label>Spôsob platby *</label>
-                        <div class="payment-options">
-                            <label><input type="radio" name="payment" value="ucet" checked /> Na účet</label>
-                            <label><input type="radio" name="payment" value="hotovost" /> Hotovosť</label>
-                            <label><input type="radio" name="payment" value="kreditka" /> Kreditná karta</label>
-                            <label><input type="radio" name="payment" value="sekom" /> Šekom</label>
-                        </div>
-                    </div>
-
-                    <div><label for="doprava">Doprava</label><input id="doprava" /></div>
-                    <div><label for="sprava">Správa</label><input id="sprava" /></div>
-
-                    <div class="full">
-                        <label for="note">Poznámky / pripomienky</label>
-                        <textarea id="note" rows="2"></textarea>
-                    </div>
-                </div>
-
-                <div class="actions">
-                    <button type="button" class="secondary" id="back-to-template-button">&larr; Späť na výber typu</button>
-                    <button type="submit" id="submit-order-button">Vystaviť objednávku</button>
-                </div>
-            </form>
-        </section>
-
-        <!-- Krok 4: výsledok -->
-        <section class="card hidden" id="step-result">
-            <div class="banner success" id="result-banner"></div>
-            <div class="actions">
-                <button class="secondary" id="export-excel-button">Stiahnuť Excel</button>
-                <button class="secondary" id="print-button">Tlač / PDF</button>
-                <button id="new-order-button">Nová objednávka</button>
+            <div>
+              <label>Dátum vystavenia *</label>
+              <input type="date" id="order-date"/>
+              <div class="field-error" id="err-order-date"></div>
             </div>
-        </section>
-    </main>
+
+            <div>
+              <label>Interná zákazka *</label>
+              <input list="zakazky-list" id="zakazka-input" placeholder="Číslo alebo názov zákazky..." autocomplete="off"/>
+              <datalist id="zakazky-list"></datalist>
+              <div class="field-error" id="err-zakazka"></div>
+            </div>
+
+            <div class="full">
+              <label>Dodávateľ *</label>
+              <input list="suppliers-list" id="supplier-input" placeholder="Názov alebo IČO dodávateľa..." autocomplete="off"/>
+              <datalist id="suppliers-list"></datalist>
+              <div class="field-error" id="err-supplier"></div>
+              <label style="margin-top:6px;font-weight:400;color:var(--text);">
+                <input type="checkbox" id="new-supplier-toggle" style="width:auto;"/>
+                Dodávateľ nie je v zozname – zadať nového
+              </label>
+            </div>
+
+            <div class="full hidden" id="new-supplier-fields">
+              <div class="form-grid" style="border:1px solid var(--border);border-radius:var(--radius);padding:12px;background:#fafbfc;">
+                <div><label>Názov *</label><input id="ns-name"/></div>
+                <div><label>IČO *</label><input id="ns-ico"/></div>
+                <div><label>Adresa *</label><input id="ns-address"/></div>
+                <div><label>PSČ</label><input id="ns-zip"/></div>
+                <div><label>Mesto *</label><input id="ns-city"/></div>
+                <div><label>DIČ</label><input id="ns-dic"/></div>
+                <div><label>Kontaktná osoba (Vybavuje)</label><input id="ns-contact"/></div>
+                <div><label>Telefón</label><input id="ns-phone"/></div>
+              </div>
+              <div class="field-error" id="err-new-supplier"></div>
+            </div>
+
+            <div class="full">
+              <label>Text "Objednávame si u Vás:"</label>
+              <textarea id="intro-text" rows="3"></textarea>
+            </div>
+            <div class="full hidden" id="billing-note-wrap">
+              <label>Text o fakturácii</label>
+              <textarea id="billing-note" rows="2"></textarea>
+            </div>
+            <div class="full hidden" id="attachment-note-wrap">
+              <label>Prílohy</label>
+              <input id="attachment-note"/>
+            </div>
+          </div>
+
+          <h3 style="margin:14px 0 6px;">Položky objednávky</h3>
+          <table class="items" id="items-table">
+            <thead><tr id="items-head"></tr></thead>
+            <tbody id="items-body"></tbody>
+            <tfoot><tr class="items-total-row" id="items-total-row">
+              <td id="items-total-lbl" colspan="4">CELKEM</td>
+              <td id="items-total-val">0,00 €</td>
+              <td></td>
+            </tr></tfoot>
+          </table>
+          <div class="field-error" id="err-items"></div>
+          <button type="button" class="secondary" id="add-item-btn" style="margin-top:6px;font-size:12px;">+ Pridať položku</button>
+
+          <div class="form-grid" style="margin-top:14px;">
+            <div>
+              <label>Dátum dodania</label>
+              <input type="date" id="delivery-date"/>
+              <div class="field-error" id="err-delivery-date"></div>
+            </div>
+            <div>
+              <label>Spôsob platby *</label>
+              <div class="payment-options">
+                <label><input type="radio" name="payment" value="ucet" checked/> Na účet</label>
+                <label><input type="radio" name="payment" value="hotovost"/> Hotovosť</label>
+                <label><input type="radio" name="payment" value="kreditka"/> Kreditná karta</label>
+                <label><input type="radio" name="payment" value="sekom"/> Šekom</label>
+              </div>
+            </div>
+            <div><label>Doprava</label><input id="doprava"/></div>
+            <div><label>Správa</label><input id="sprava"/></div>
+            <div class="full"><label>Poznámky / pripomienky</label><textarea id="note" rows="2"></textarea></div>
+          </div>
+
+          <div class="actions">
+            <button type="button" class="secondary" id="back-btn">← Späť na typ</button>
+            <button type="submit" id="submit-btn">Vystaviť objednávku</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- KROK 4 -->
+      <section class="card hidden" id="step-result">
+        <div class="banner success" id="result-banner"></div>
+        <div class="actions" style="justify-content:center;">
+          <button class="secondary" id="result-excel-btn">⬇ Stiahnuť Excel</button>
+          <button class="secondary" id="result-print-btn">🖨 Tlač / PDF</button>
+          <button id="result-new-btn">+ Nová objednávka</button>
+        </div>
+      </section>
+    </div>
+  </div>
 </div>
 
-<!-- ============================ TLAČOVÁ VERZIA ============================ -->
 <div id="print-area"></div>
+
 <script>
-// =====================================================================
-// KONFIGURÁCIA - doplň svoje údaje z Supabase projektu "dispecing-dev"
-//
-// 1) PROJECT URL:
-//    V Supabase dashboarde projektu dispecing-dev klikni vpravo hore na
-//    zelené tlačidlo "Connect" -> v hornej časti je "Project URL"
-//    (tvar https://xxxxxxxx.supabase.co).
-//
-// 2) KĻÚČ (anon / publishable key):
-//    Settings -> API Keys.
-//    - Ak vidíš záložku "API Keys" a v nej "Publishable key"
-//      (tvar sb_publishable_...) -> skopíruj tento. Ak tam žiadny nie
-//      je, klikni "Create new API Keys" a potom skopíruj Publishable key.
-//    - Ak má projekt len záložku "Legacy API Keys", skopíruj odtiaľ
-//      "anon" / "anon public" key (tvar dlhého JWT reťazca eyJ...).
-//
-// Tento kľúč je VEREJNÝ a je v poriadku, že je tu vidieť - bez
-// prihlásenia (email+heslo) sa cez neho nedá prečítať ani zapísať
-// žiadny záznam (chráni to Row Level Security v databáze).
-// =====================================================================
-
-const SUPABASE_URL = "https://qpzktpuiyqwujbfhvxnb.supabase.co";
+const SUPABASE_URL     = "https://qpzktpuiyqwujbfhvxnb.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_B-2vQMUsXudJCUKSZFYTKg_RrXwf2_o";
-
-// Schéma, v ktorej žije objednávkový systém (nie "public")
-const SUPABASE_SCHEMA = "objednavky";
-
-
-// =====================================================================
-// SUPTel - Objednávkový systém - frontend
-// Komunikuje so Supabase (schéma "objednavky"). Jediný spôsob vzniku
-// objednávky je RPC funkcia create_order (pozri 03_security_and_functions.sql) -
-// frontend teda nikdy nezapisuje priamo do tabuľky "orders".
-// =====================================================================
+const SUPABASE_SCHEMA  = "objednavky";
+const LOGO_B64         = "iVBORw0KGgoAAAANSUhEUgAAAQUAAABpCAYAAAAz1zYEAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAAIdUAACHVAQSctJ0AAGb2SURBVHhe7b0HnBxHmf6/Oa+S5WwfNj7g4ODAlmzlsKucnAMOZ8CAjQMZk2yiDdgH+Mh3gAOcbfjBHZhzUM5ZWuVgWZJlZSvLVtydme55/9+nenp3drS9u7OMP/+F02gfdfdbobuqq55630qdl0wmLRP6pR8zkSt5iCj3bOVtISpclLyjyHV8nQm5TltUfFHythAVLlt5iCj3bOUhotxzJQ8R5d4e+WlSaEXeUeQ6vpbhpyGQ+Y3y8Dw4huenoilsi/BPPTf9pcsdwnjSn6eNuFOIyqsoeVuICpetPESUe7byEFHuuZKHiHJvj/w0KbQi7yg6Hl9ERcqshH7cfL+B87RK6Ccs6SXMF5LHwTHzvKPm+dss4W+1mL8ZbLRYciPXyy3urbS4vxjZIo4LU5gH5hLHPPzM4Xyak8X8yRbzJnGcSPiXOAoTrQFZgzcDv6st4W0AxJ3Yw7PsBw08Y/CcPs/vJ2McQbK+KR0gKq/4j7/0/HhrSCZKHiLKPVt5iCj3XMlDRLm3R36aFFqRdxQtx9dSoQ4rNEcqUDJJxXbnCfPcuYDcrw8qun8E7HRI+OupsHVgKViE/zr8LMPvwgDJFNz1AjAHzEU2D0zjfBbxTOc4iePzHF9A/hfieJ64JoJJQPL/Bcj95wIkn+X6vyGbZ3F/CvwW5eFXyJ4Cv8T9Z/j7Ce7CL3jOHwTwHoNI/hM8zflM/MyCtFZy3A4J7eN4nPuTbt9z8MkbDzLReVLX3mlSaI88RJR7e+SnSaEVeUeRfXxqUeupAAep4FupEGuRrUX2MhVqBRVvLVgDVlNBVhI7x+QSKiOV3aj0ggihESmZg0hAZDATzOEec4h/hoPnMJ3zl3CbCEQML7pzz/8j8udS8ue4/h/8Qgb2NNd/soQ9A550SFLZk8knzPyfkvCfcfxFSvbvXP+I5xV+2AjJPf9h8F3u8WXwDc6/Db4EUTxo8cRDdjLxR4sleE5/B+5HCANBtph3zaFfLuQhotyzlYeIcs+VPESUe3vkp0mhFXlH0Tw+aQBSm9XaHadiHeSoln4doOKjzvscVdmTqPWWfJljHWFWpUEawPLAT2PFlx9VehEDFb+RBFJE4MhAoFVOkUBzTKeCT8FdlX6i+SYtQPgzYV/gOf/I/UQWL7pzL/kHRwieIwNae8jAT1LxVfmBOfwHz/9jjhCDcXR4jDh+AB7h/FEAMUAKfvJr+Psm8ge5BvYA519C/kl3TCYf4PwzPNenyJ8vQBifx4T5Fvg5+fYC2gZkmdhtfuIk95dpgkZxSt4LgYZxqjxAlDxElHu28hBR7rmSh4hyb4/8NCm0Is8KUvtTrRmnAFs6uZfK9CqtPwSglt5eppBDBLYeuVr/FfhZjV9VclX6ZTyICIIK72QiioAsmpMCWkJyEQhJIaUxhCZDihR8pyFIM5jN/adxvwAiBXcOKchU8BtJ4X9ASARoCc6kkDnxJyAt4b8CUkj+F8+MqdCoEYgQfhIgqaM0htR5ElKwfyPe75HLIoYUKUACIgNV/qR9ETkk4H+Z+9yD389z/gWOkELyU8juc+Tg+RCEh7v/CeT3cX0vuB2CuNcSiYdxQxtKHMNNeR/nOY9ZXGYHZph+p7wzECUPEeWerTxElHuu5CGi3NsjP00KrcjbD59CKPX/AAURIvC3UZDXIVtPYebooPPwej1hOKfy+81af+C0BmkBOocI0BRM2gL+mvzKdEgRQrqp0EgUkEGoLTjMoWWfSoVOIZ0ULEUKoZaQ0hykLQR4HuBmfyZdmBCQgpfEhPAfx99/gF+mgFbggJaQQtIdf0i832tEM1JwmsLXSVdACgZBJJKq8J9LA2RgASk4QBSeQQx2L+Hu4Tk+QhwfI9wtPNenIeDbwS0QxX2WiP8I/C+axR7iF2mH/RJ6X8FRv1PfZxOi3LOVh4hyz5U8RJR7e+SnSaEVeRScKSASSB6lYB6mYKLG+q9R7DaAV7CLt3CUViCN4BUK7HL8y1R4FaxGpsq9ylXyBOeugzBFAo3mgwggBG6+61MIr1eApQASEHFACI5gpG1Int7X4KDrWYSfhnvQlxBoCwCS8JOTkKfIIJ0Uki/g9hf8yXz4b84hBpGCMyF+w71T5kNSBPFznl0agsyHX3AUKcicUH/Co5w/QvhAU0jiT/0IBgJT4cvgK9zzAeKGFFzlFyF8NjhPwSCCdCT9Owl3C/gw53cQ3yfA3fi9gbhuBhCFTYDMbraYX4vpcafFEr9Dm9iHVqEOzBjx8E5PGWJtgn65kIeIcs+VPESUe3vkp0mhFXkT1MLIZj3pSMD3d1FJtoOtyDQasBmowkMEyY0Uwq0UzJcpkOvwk04KkAaV20/1Fegos8J3lV0VWgSxhpZN50BHRwyLkavDUX6Br/DqL5hPkV4MpDFAKgZZ+Gmk4MwMCCO5AITmhPoYZqcAUTjNYbKDRh58iEDnQYfji+7ad+aDOhr/yPP+huOzkIJMiF9b0vsl10+4Y2A2iBQgg5RpEfQfPAoC8yGJ5pD0f8b1t/DzLa4fJJ77Of8afr9CXGgAMhuc+RBqB58OZCKCdFKAABwp+B+GiG/l/KPg4/i9Hn83E9cN4BrAuXcj7+Vq4r0WjEGbgCQSX7AGD5KLb+P54xBFDL/qAxJhBO9ev1PLQ8fLUpR7ruQhotzbIz9NCi3KAzVTw2LBGPubFJbDVIg9yAOtIJncRqjtBNyFuwghJIVNzj0wHYAjhRUcg76EhAhBowdAmoLz40YTAs3B4xh3JCLtAEJwboonMDsCswQ44iCMG9ZT/PKv41IgEpD2IFlACkkHCMSNQoR9DXM4pjodk2gMfgCdJ5Mvca7+BQHzwUdLUL9C8v9x/hfSITMCMkBLCDodNQrxU65/HJABxBCQgjoZhe/h/2GO/4b85/j/NkeufbQF9SlwFCmoo9FpCZgUvnHuSEF9C8gggoAY7iHvOXqYD0mRAaSAyWDSMtAYfMhApODb9dwTEkh+kONVDj5IJkelMAz/48nvfuYnhlp9/FZLNIi8j+EWDIuqeATHsGwE0C9T1po8RJR7ruQhotzbIz9NCplykYAbHjxJK3rYwZL7UtiLH1oV4KMNOGJIvg62U3DSSMGBFr3RfFArj1khWEgEISRDo3BaBdqFJhdRwRPOzGhCED/3dfcW6ej+IidMFWkrlgbcDALzeTYNcyadibMvgEca3PEAYfXsWzhuRPYKx6CvI+meYzkaSx3HZcQxnXuqk1KE8ULQ++//iWf8HXgS2e85yqT4NXiC+4osNHcBTQKtIOmGJGVC/Bs17Occ/xM/D3FE5kEOya/yHJACxNCcFEQIMiNSSJkRnt1FGPUnfILj7eBj+L+Ne+j6Q9zvg02kYCKF64l/PP7Hcw+Rwgj8jsDPmBRG42dwIzx/mCW8661eWpC3AxyDfJsPiRJhs+smOS4tyENEuedKHiLKvT3y06TgII0AlTFBC0El8qg0XvIQBYTK00gIASmYSTOgMvqqjK8i25WSvUqYV4hHlRdzQqYCFV7nrlJT6TxfrfwqrmU2SGt4GWwFr4JNyHfg703uqR7049xDE5eC50sf3XBIydW/EUx4SoNaObmHSIUJpzw7DchBsx/TZalz4miSBX7CuKhVLv5gqPUkOAr28fyrUckxc7y5VCJMDu//kZ7fcXyC43+Qdk1qgiC8xx385HcJ9wPkXydGQf0LIoXPgvupcmgNmBXNSMG5fZaKfjdx3sW5yCHoaEzaR7iXSEEmBNqD3Yb7rfi7Gv/X8NhXOiT9cbiPJh3CGN4f1zYcvxCCL0KoBUO4fi/xXUr4XpDDQPPqf4L7BspIgnTqPbyJu/KiKX8F/TJl6Yhyz5U8RJR7e+T/x0mBQk8F8GQeuNZULae0AUgBDaE5IYSksBu5Wmgqv7c7kKdIwc05kJttIU4qeYoUNPvQd52Raq33E5YKj/2a9DRVWZUrvaKdWtA6E07NwxBBGjQTU9ObPb+Bc5HTSfLgDSCiFZGqz2QJJPIH0h+MTiQN8wJY8pu4f4HzL3EXzVuQOZFOCgE0+uBxTKqvAXNBnYzBKITMiY+DgBSSydvwJ03hZgjhaqclOI0hCRmIEBwp6Ho4zwshJPuC3gBzwi4l3L9w7O/k8eS7eN99LeZ9wBpi30WTEIGLHML3FRz1a54vzRHlnit5iCj39sj/z5FCU+un0QNNJjqSAi20T6Wn8DaSAkRhgiMEVeiAFKTCByaE+hTktoNCKJlU8Z1BeG9/ilhU0eOEUavauSt8e6BfS/LsIZsdUvTIH9TzpEwif6bF/CchjEeopN/hnXwVmUYnHsSvtIYvcN1kViT9zwCRwJ34vcORRdK/D7egnyEJGfjJm8DNmDVX40fEAJJjSYU0BcwIaQrqW5DZkEQjAL5BCiKEFCn4ycvx8y/EfSnH97jzWPKd1uBx9H5kflxTtVPvV/njNLaW0px9mc5WHiLKvT3y/1OkIASEcJSXfYICcAwEpOCm0jpSaNIUElwLqvgeZoLn7+TO0hRkz2sEQpOTZGao7wEb3bTYRyTAvZwar3vqmFLn057jbxV/Td43gzNHgjwK3okqUghpTZoFKg1DHanPWdz7Fa3113kHDwJNboIcfDQGkxkRdEAKmquQ8GVCYFIk/xW3W4E0hqshm/GcX4t8OIlImRCYE55Xi1xE0Jc4hD6cvx+IGC53cKTg8M8AYvAwL5IX8wzv4H7vRXMY6+ZE6Jnd2g3SIU0pM91R+ZcreYgo9/bI/85JQYWuCX7yBC/8JC9LqwelJTSRgtMUXKvfpCl42Peer3n3IoWDvPxDnGsVoIhDtrRIILTzKQBecN/2P9/fHnKdtqj4GuVULvX3BAvEyGPeRyJRB0n8Gdv+Z7wfyCEpgvgy0Pln8Xs35yIFmRT/CtQZeRvvXkOU1+FnvJl3HTdI9SlAEr5MiCSmgl0RkIL/AeT/wvXlyHu58yZSeDeQ1qDjJeBt+L+I8vHPVu/9s8USX4VoNjhyUPkQQZySrgzkSh4iyr098r9/UjBa7kZQiYHnS0sIyUBIkYW9QZh0UlCHH3IfEnFTZ4XwBTe96Ey0//n+9pDrtEXFFyV3CLUut+YBbSKOqeZPx/T4gTVAEJ73Sd6fOh01j+FDABPDjUhoaPJGwowjcojBYQzuo5EN5d1KW5C5MBBZX+IXKfQi7nRNAS3B3gXe6eAn3w4uTEHnaA/2Hp5BGGrxhBacqV9FjVL26c1WHiLKvT3yv1NSoFVxqjxMLTJw6qmWHwekIARaA9DRvbQTqJcHKTQafYAQXB+AiCRUAaNJIBNtP9/fLnKdtqj4ouTNEbbCqnC8q5RW4ftbeIe/4/pb5iU+yTUE4Wn2443gw7xbdT5qUpM6HkUQ0hYwIfxwWHII1725fi9vX+ZDuqaQIoXkPzn4yYuI5wJL2Pn4PY/rC5D/I8d3BHLvYjSHywBaTfwwzwGRaTZlRlqi0putPESUe3vkf7ekINOgUVNwtl0TITSBip+CNIVAExCBiFQUru258S2hI2H+VpDrtEXFFyVvC/ppMxfP8zEvPHCc61fBw1RIaQ8ihXBS09VcS1sITQhpC4M5rwGQAgQQ9C+0RArqcBQxXISfCyGEC4Jj8nzc0SKSwtshp7fT2JzN8QII6iI7Hr+fZzmI26nPnSnriDxElHt75H9npKCWXZVZFVubdqS5NZJAYD64zsYUCWSjBbQH0c/3t49cpy0qvih5W4gKp9bZT6hfYiOE8Yw1+PdbwtcEp5uoyJrQNIayIDKoBSM4x4zAfPCTA0AfZO8nrI4iA+F9lKV3cERTgBCS9jb8vZ2jTIsAHjKRhCXPwe08ZP/ormP+RRaLf4zn2UKcMeLgGSOeOyo9UfIQUe7tkf+dkIIqtcigiRQ03BjIIYPwaHoBskNFGtIepHbKxEiP66/Hqc/394Ncpy0qvih5W2gtnGsAGk0MlQmNMP2PxZM3WTJxPcRxJeVmAHLNcNTQpOYtiBxkTlzWjBR8X52M78JfYD74dgnHf6Akqa9BcmkJ5+MvIAWRgad+B66T3jnEhfaAplGf+JAlY+q0PmH17jmbN1BR6YmSh4hyb4/874cUIAPtAxiQgs5PBHJHCvKjo0hDmkF62LafL1vkOr7OhFynLSq+KHlbiAp3ilyk4BoHGo+YjtvQIH5pcU8dk6O4DiYzOXLwhyKTCXEFSA1JhqMQjgwgheQlQKSA9hB2QIoA/POwZ0QK53F9IecXgHMJKxkahne2JTAr6hMPQEr78RNoDtGbxgSIkoeIcm+P/O+KFNIRTBZK9xPg1LBtP1+2yHV8nQm5TltUfFHythAVrn1yKiSVUXNS6hOfx8QYiaNGJ4YiEyFIU8BsUN+C3xuIGP6J8naJg5e8uPm50yLOdSRgybPAOSlSOJuwFzp3S3LuCOI8i/tvs1jiUcwKCCERaAzB8wXn6QjkzWXpiHJvj/zvjBREBEEfQdBXkO4nGqfG99ch1/F1JuQ6bVHxRcnbQlS49slpTGReqPy4BVBvoj1MtZh3B6bAICrupbhr2rO0hvcDEcQ/AvUlXEw4ITAdko4U/sFVdmkKqvwBKQicS1uQFpE80yGZ7Jkiip6YNO9Ce/ij+XHKtMzdLEYrQkS5t0f+N0kKp0JMqgwUKZzKqiGi4ouSdxS5jq8zIddpi4ovSt4WosJlKxdEDgmNXiREFq+Y3/Btrj8AQUhrkLag0YgUKTgSuBgSECloSPLtnKsfQRX/HNwCOGKQ1uC0B50HpBCcn8/TnIWWcJbrj6hPvJOjps2rH0zluqlst/bcQpR7e+R/J5rCX+cWJe8och1fZ0Ku0xYVX5S8LUSFy1Yeopm7r30fD1BRH7OENxSC0FRnQZ2O6l/QUOVF+NNsSCq0Mx8CIvCp8JrLEFT+KKRIwXsb4aU9nGnxxMUWi91PnM2HMZs9VwuIcm+P/G+eFNLP20KU3yh5R5Hr+DoTcp22qPii5G0hKly28hDN3Wmp/UCDSPonaMknQwzjqPiX0rpjSkASSUgigDobA+3BPM1fUCektAd1Ssp8OA//byPyUFOABDAtnAnhXwIgh2Q35GehJZxn8dgVaCwzISSNoLQ9Ytb8ubOTnyaFVuQdRa7j60zIddqi4ouSt4WocNnKQ0S6u74HfZznOFqDvpil/Rg0l+E9QP0NweQlISCFC82HFNTPIFJIaqjS+wciTyMFd4QIfB27ci1SUEfkmYQ/23z8J7w7Ca/p+HFkuTOV0+V/s30KrblFISpMlLyjyHV8nQm5TltUfFHythAVLlt5iCj3ZnJ9wcurN8/7M8cr0R60WEr9DTIr0BYcKZzntITATJBWEJJCqgMSqOMxmexOzJCC9eRcBKEwZ3AteTdkF1m94ouvQztJTXxqAfp1VN6pSSHXiLpPlLyjyHV8nQm5TltUfFHythAVLlt5iCj35nJpDZoQ5UEMDRb3/wAxaPemSyAJbdaiDsiLnPkQaAqYBpr2rPO04cokxJHUeSMpdEUurSEkhTNc+KR3rsW9i6wh8VXiR1PhGdzuWGnQL/06G3mnJ4WW3FqStQdR4aLkHUWu4+tMyHXaouKLkreFqHDZykNEuUfJ3Ud0E5oMdcL82C/N87XnQjAaEZgTQeejSEGzIVskBZEGROD7Mh8CgghIQcOWaBea5+BVQkBnWiI+HH/a1Ss1OpFaQapf5rO1V36aFFqRdxS5jq8zIddpi4ovSt4WosJlKw8R5d4eubaM9+PHLOZ9HnLQKEU4BRoycMOWQjg02TT64EMYSbQFZz44QhAxpMjBmRPSHvCPOZHQqAZaQzy+gXCazyBiiF7I1x7533xHYzaIChcl7yhyHV9nQq7TFhVflLwtRIXLVh4iyr098kClT1XU5CtW792CFvEBKi0ag5sKDSmob0EV3eFCQmsOA+fWA/eujhxkNjhNwfUxaNKTTIvuoBvn6p8IOiPj8cchogbiPE64jj/3aVJoRd5R5Dq+zoRcpy0qvih5W4gKl608RJR7tnK3C5O+c+lpM5jLqPDSGCAGtz4CzcAB08CRgjSGHoTLMB9SpGCOFNTpqGuZG2fjfqZ5iS52LHEXxHOMa20Hd+pz6Jcpy5SfJoVW5B1FruPrTMh12qLii5K3hahw2cpDRLlnKw8QqPZ+4rgl/E9zLpNCWoPWS7zNPBMpyGxAY9C0ZxCYCV2d3FV+N01asnSzogdQnwPag19p9bHRmC3aGkBbCUpLaXoG/dKvW5KfJoVW5B1FruPrTMh12qLii5K3hahw2cpDRLlnK28CpKBOQeD5G+yEr/0aRArayk1rJc5xMxpdZ6JIQesk0kYknBbh5jFIO1CfQxMpJJPVxFHpjg2J91qyocHibvp/0/31S79uSX6aFFqRdxS5jq8zIddpi4ovSt4WosJlKw8R5Z6tPES6e8Lt7/CmxRI/Nc/7F8jiPY4U3EzIkBRcB6SIQUSg0Qctv9Z50NHYIilYF/xV2EnvnZaMazm2TIlAY9AvvH860uWnSaEVeUeR6/g6E3Kdtqj4ouRtISpctvIQUe7ZykNkuvu+vnlxHK1hh8W9y7hWX8M7gPoaQlIIoU5FDUlq+LIlUuhCuApHCoEp0c1O+peYFzvEebA9oX7p9w+RLj9NCq3IO4pcx9eZkOu0RcUXJW8LUeGylYeIcs9WHqJl95Td7520mHcvBPEezjUTUusjtPQ6WGnpSCEp0yJFEhmk4CerQJn5VsY1BOGLJKrQRCCZk4ctoe+I4tL83gH0C89Pk0Ir8o4i1/F1JuQ6bVHxRcnbQlS4bOUhotyzlYeIctfPfWbPO2ZeYrYl/H+CHM6mgmuBFFoDJBCsnAxIIZj5qM7FTPOhFDIoS51Xu2PSq7YjiXcTt/oXUn0aLdw/PD9NCq3IO4pcx9eZkOu0RcUXJW8LUeGylYeIcs9WHiLKPV3uPkcQ3271aAt+EnJIXug2h3Xbt2FaNI0+CBnmg5U4DSEghSp3dOd+OfGNRaZtCvUN0+j7nyaFVuQdRa7j60zIddqi4ouSt4WocNnKQ0S5ZysPEeV+qtxDQziCOXErBKEOyIshBk2DvrgF86FbIwGE5kNgSjQRg/oaLNnDEomHLH6aFJoQFS5K3lHkOr7OhFynLSq+KHlbiAqXrTxElHu28hBR7qfI3bBlwpkT9fEHIAUNV8qMeHvQx+CIITQfRAopjSCJpiBiSCOFABqq7IZJomnRvyCu5tsVpt//NCm0Iu8och1fZ0Ku0xYVX5S8LUSFy1YeIso9W3mIKPcoebAVW9ziiaeoyBdx/U4IQXs5ag1ES+ZDIQRQznk6IQRIWjVhz4cYepiX2IyfpvvoF56fJoVW5B1FruPrTMh12qLii5K3hahw2cpDRLlnKw8R5R4lF9xGsm5Z9v+iPWibN02JPp8AGrLUHIZgbURjn0KjphBAS7Cd+eBI4Wzi6mEN+m6FX2+J1CcQ0u9/mhRakXcUuY6vMyHXaYuKL0reFqLCZSsPEeUeytu7j0GIKPf2yDXZKeHPQP1/NxVbS6/REtxQZRopJItBOilUAmkN5RBGJX7PxCSpgGAqLObdZ35C31Vtfp/TpNCKvKPIdXydCblOW1R8UfK2EBUuW3mIKPds5SGi3Nsr16cLEonJHC+GJFIdjo2koJWVRaACVDkSaOp0FCmU4bdno3vCOw9SWM958/ucJoVW5B1FruPrTMh12qLii5K3hahw2cpDRLufoFLFsc01StAkb/IfzgUIjm6zV+fe5DcdTeHaJ094z9Liaz8GbQ6rkQjNYRApiARCIqDyixTS0EQKxZghwOtnfiz8tGIQ92lSaEXeUeQ6vs6EXKctKr4oeVuICpetPIRzx57XlmdJTyq8T0VqsDePNtj931xgf5q7B39NFUq/4DulCQhDfQHHLQZpLH31sG3ef5Jrs7jfQIVuCtN4n7TrtuR+PGEnE49RsfWR22DBVCMpiABcxRcCDSHoa9CwZDopFJjnn0N6nifs3x0ppGdw88xOx6nhWpd3GLmOryNIa71yicy8yrSpW0Lop5nfDm4b1haiwmUrD4Erx+CDtIvWvmaf+/4GO3f8Qus5dqWdef1i+93EAxn+g/hilMP/nrHT3nv7QvvCkzvsVzMO2Q8m7rMbv7PDPvyVJbbtjeZfRQ/DZSJKri3mfcilwb+J84vxpaXWaaTgiAFCcGZEQArqc0gnBTdS4XWxk4R328an6s4ppODsC/3hIaGPX+hb/2SIZkJpbNN3H2nVtxobiCgGC8qPrrF15AabBh941Q4wgsKmwnHuEcb504c09fUdX+u+xaioMPpUl/vop8ITtz7+GdfDhs+m8PqiNA/PfVycLiGKT/dXPPqCb/M0hYjK4Ch5JnT/ROo53TM33l9jvhQcnbsPhuAnFoSp5zr4LqAQxBGcKzzQ5+5cWLkp3iAeUoo8zAtdx4IjCPI3jEP+8auWR/sD6nuILj/iFks08Lz4Qc2Nu3xtyst06CvcThUGejfBV7m11yDvXh1R3kncU3DvGzn+3LtwCMJ45IvkOo/r0+88v9xjipdjfero4ebC4V/xeZQTlQvJtHOQnqm97yQTUeGylQfwbd+xk3bdx6ba28ctsG7j5lvXCUus+4SF1mP0EjvzmlX2X9P1kRa9iyCMqzuk66ZH5trnHjtknj5eS5q8BJU4ccTl8e5jR+2iu7fYpqPHUuW4Y8+nfE42kNf+AOLRZrBnEZf6Eap5DHUuqpOxCkhbKCKMSCHlR9OhrZT3BWH43XjGSbyzIO+bkYKrwNwowUs7cOio/fS5DXblF2bYRVc+b92HvGDlA6dbcf9ZVtRvuhX1n25lA2ZaWe1UKxk02cqHTLWiUfOteNAMK+47z0oHz7fyQXPszNopVjoQ2aDZVlwzxYoGzuJ6npX003GWFfebbUUj5lrliHnWbchkKx00i7hmWSXoMmahHfLebHy+2WvfsK7j51qX0bjVzLeqYdOsasgc61o73bqPmGHVY2bajd9c1eg/E1EZHCXPhFS+j317sVWNXGJdhvP8Q6dZRc0sQNpr5lpJzWzrMWyKzd2kffmC7bd37zlo5SNmWlXtRPJkohUPeNFKB0wlHydbyYDJpJ/8G8j5wJe4Rj5gIucTyeNJ5MV0/E5DBuRn8AzcphLPiy6ekoHTCDMNf5N5F1wPeIH3gt9+5Hl/4uo7xboP+r0N/Ogk+86v6mzrjn0UTL1j0pOmSWzYudfufmix3fPNpXbHN5fYx75ZZx97qM7u+dZy0rvK7v32GvvE11baJ76x2u56KJB9+GEBf99dbp/4dp3dwflHvyOscH7uA7c/stTu/bel9incPvmdxfaph+bZvT9YbJ/8/hr71KNL7b7v19nnfzDPPvvofPv89xfYF3680E5QefRM7X0nmYgKl608xH8+u96qr9psXcYttkree/molVY9aoV1GbHYuqMt/H5qc00hmUjaS7M3WO/7d1ki/ob98Pdb7bKPrbQRD75sl31yvV12x0I7fMyzfYfftH/50GbSq1WSHX9uR8KJrWgMwZesw9EGtyAKQvAcKYSaAvLk2U6uSU7qUwj6H7paQ3wgBK3vSWSQghZk7Dp0ws6lsBYOnW95Q+dZwcAFVjSozgoHLbI8Knten7mWd/ksy+/Hed+Zlj9gtuVdMd0K+s6yvCFLLK//RK7nOLeCPjOsEjLI70cYhes/g+NMMJU4ZhOG8FfMtwLuVTx0oXUdTLwD5lg+YUQORePmWLyhSc2av+aQdR810ypqZ1tlzRLIaDoVY66VE65y2EwrHT3frv3Gjkb/mQgzsr3yTKh1vv7RjRAh9x48nfRAaIOXgAXkz3zLHzjbqmpm2PwtR9Fygq9e79h3ALKYRlqnWkE/SIBKnddPeTDF8vtMtqIBM8gDZJwL+eSNroXADTl5mz8guF9B30mW3zfwWwg5510+xfJ6T+N6EvFyTp7mXR64510+nfhmWOEA3g0Enj9oqp0x5Bk7dkItNFpcqoWb+8pa0vQS74D4h8yFWOZYGcSt8/zBEPgACG+QysJsK4T8CwbOIR2zrAASyxswhWfiORU/z1MguZ4TAisYNM2KiLdoqMLgh3dVXLPIioYttGIai5KhM6wKVA6F1IZMt7PJ12OdSlNI2g9/u8WqrlxJI7DYykbWWfGIhVZKGsqHLbGq0XX21ORtiqDRf9w7bgM/ss72o6XF0LR++cJWe+Cp7TQoMVp0zx59ZJN95jdUYrSoWx+dZ88vOuwa46jnaI88rrKWeAlywYzQtvBu6bRIIZzlqIofmBIBKUimPoU87i03yCNRBna5+BwpSH1J1Mfs2z+ro/WdSeGgovZfzEtfaPn9IQfIIL8/56nKnX8FFV0Vn4qdT4HM763KjdvARRwpqL0gisup3JdTYfsTFr/5XKsyFPRVmDkcKegKfwXkMmApha2O1o3Ciwahwl82AM3h+rl2XGZGKvFzVx+2bsMXWcmQhVTCebSWFGBIpAS/ZRTgsmGz7LqvvNLoPxPpGdkeeSb08j72xbUUaEhgCOmmsuX3W+yIrIBnyaM1rxgywxa8dtTqnRqftJ37DkIaVOQ++BcRqBK7yj/RVXARqvIprzdkevlLgIp2BeTZi7wiH/PfjzvX+ZeLZJWXuhYZQAS9ldccexGmF/nWm/ggAud2ueJIHRUfGkkexFKAtlfW7wV7bs4WnlGmS9JmbHiZZ0wRfD/ek94xacrrQ5x955I23h8anZAHsTmZ3BSv7pdKT2E/7tefNFIe9K4dkQ0QWal8iODIAxqZvEErAOeUjUI1BNKSIMtu5OsJmWc8U3vfSSaiwmUrd6AF/8VvVlvV+HmQwhIrHb7UiocvpJzNtdIRS6zbmDp7evL2ZmGOHTlqb7t2qSVOnsRcqrfH/nezPfD0ZupYPaY2jco9K+xnLx12ZtqsNXtt7A9ehzzikc/RfjkGpjeCZ9YsR01/DjQFQdObm/oUUqSA6eD6FPxg2DLml1si8TBuHqRAwj3vDfv643XWlRaggBa7YNBCXqQIQa07LWD/BRQIjioUaAmFfSggKhQiA67zLqUQqAAPXEJBp2CIIHrzsnvT4lPIRAqFfSEXTA6dB4Vb4SmkfYhb4QbR+qrwSAOBFErQFnp/cbE1pFoOYebq11Hh/ocWZh6FmBZHLc+A+RQoTBXU98qR8+yqr2xq9J+JUzOydXkmRAp3PrDGmQoFg2nNaR3zBkCEg1SJaEnRbqpq5tjC145RIILn3o75UAyBFDgNgEpyhSruFJ57MrJJVgjB5vUmzZeJDIAqsVp48kdE4CpYb1Uo8pc8zO8j4piIW0AWrlKSj/Kbp0p3BUfi0Ptx95ObtDPeS740NVrz/EHPk3eT7MiJQJuZuXkjZPGia+UdGaApOI2N9+8aBUcUPGd/iEmaAY2DSL2AeKXtFfbT883knfFOeceF0k7QNBwZSDNSfPh1pCDNcYiI4UXc5ljREOLl3oWQxBm0wCcSnYcU1Fj++zMbrOzqeVaNdlNUuwhtdAlaFeYxmkI1msMzU/YogsYwhw4fs3NvWG1eg8oApPDCZrvk9jX2/ju32TnXr7dHfnPQEg3qO4vZss27bMjXtlt9PBekwPPWb8f018dpNW8h0BR8X1pBNVpBihR8mRhhR6PmNASjE16i0jz/TPNjvuXJvnz98HE7j0QroQVDpSFIOwgKRx6VNH8AL7EPZCEyUOWn0ruKrdZfpHCZCrte7jIqNS0hGoAzDy4n82hVpBE4/2o5ZHpI3XUtmwqtSABiGLQY+5lwam0onEVDZtqnfvlqagw1SPS89W/A0tOteDBqOyTitAX1Tzh1Ftt8+Ey78muvNvrPREsZ2Zr8FEAKd31pHWq1TAWeU+YPZpVUbKnUqkgVQ2fZnE1HIbOgL2T76wepIPilNS1Qi6qWngpS2PcZrv9kl91Tx/NP4pzKo/y4Yop1HUnllQamCk5r7yq/KqXMN5077Uwko4rGdUgOIhHnLnLhnspnoMrr/FJZnT+ZGEMn2fvGTnNEN3Pzq8G7SWlpwZH3xLkagzxIwJG1iKavNBwRPf4Uf6Nmw/OIfFRmuM7vo/vgB80hj8ZEz5AH0RVA5nmYWnmD0CgGkg9oCnkDITk0mLPJS6ncyrd2v5MMRIXLVh7iR0+vtdKr5lu3UYuteBhldCRmxDA0Uwiietwq++2k/Yqg0X+sod4uvHGlJajo9d4xe+z5zfa1X77O+Zs29PObbcWuI5b0gn6TP0/eYZ959pB59bkhhaDDdiwVX6snUxu5SktwGoPWQ4gUzk8jBWkL6m+QCVHq/Cbjb8h8SNiXfopKjkpUMhhVeAhQJQWuEKZMB9cnIDgZFaEfL9eZEk3II2we9mWeTAKFo2WTPeoKmdRPWtYCaR+o0iKJQLXlKE1h4ApIAX+0QIWEqaQ1fnrqHjuWluhZKw9Z2QgIgNa4CBIJCvBCK8d/hTr6Rs628V/d0ug/Ey1lZGvyTKgC3f3VV3jW+RRmCrlLkzQqmQ8QA6RQjnzxpjdRDwNNYcee/Wg1PGday17QV+fKAyq3I0ny2hGCzAlVdvypwrnKRWVG43KVUvdzRMy9FZ+0NVXyywIidv0RMsucaQcc8SJ31yGJ8K5UQUEBz73x0EGb+8o6iEskgD9pBfKj9y+NABU/T8QgIpB5p/cr7c69P+JBi3GNAOmRBqRnUFoK1QhIs0SLcP5EIkoXZSxvYB2kEGgQRRBswSDIcsBU64KWehxbXPnW3neSiahw2coD+JgPW6x8HFoBjWZZzRIrH4apS2NUOnS5VY5ZZE9Nek0RNIZRD/7Hv73B/rhwn9VjFvzsz6/Zw0/uQBtvsN0H3rRzP7zJ4okjdtL37J23vWhrdrae3mzl+oxcPKFdoQNi8H19O6Ii0BTU1+DMB3VG5oOC4DwkBpD00EQ1bHTxECrksDlWOkQsvohCn+pUdIWBo0iB8wKZEjIjXEGRHJn6GXjhzqau5WUP5OWr34DCpULXtWY2lVwVhsqDmzNJpG5Kg0AzyKfVKBi2Ajt9lVUO5pyWvwhZde1sm7v+EHZOU5/C/HX7rQy7rmQY5sWQpVbEPQv6LcDsQFsYNMNKRs21CV9uvvorHVEZGSXPhEjhtq+vtWIKhTrYXGdqyswqHCRNYRaawgxbsEkvXXviJW3n3oOYO2pFZXdTKcLWXZ2BVwicywxT6w0pOD+qeH0JIxJQJVd+Kg8Hy4wLOvKUv/nKR1R0+ddRHX1OC3BhqJSquDJDBOIVKRSI2EXGEJP8PfanHTZt/UIaBEw8zDFpiXonRZiQRZQHtewiwXzyOt+lm/fbn4ZDFV7agEhJpiBxu/4RPYuuRS5OE+Da9RXpyDPWLAWrIQeIQ52YNbzvIVOteOhMOwMtNd6ZSIH3/f3fbbOuY5ZBCvOtYhhaHdp0WS0EgaZQMXqePfHSFkXQGMaPJeyNkzF7922bbPcbB+35Jfvs2TkHXWXVtx/+a+oWe2bafvv+c6tswsN7zIu3rhllK/dQ/2PxD6MRaPVkqC2cQeXvAino25QBKXhJraZMkYKWW5s0hwpL+P8adDSeP3yRlZPIEipkPkxeCCkIBZgNBQOkptdxjflAxVYLXYxNWDiEazSDMlSqQiqz2DN/9EorrJEf4oL1S/F31giu1TtPvMVDUfeRqU9Ax6Ia4q/lOHqtlY1ZZT2o1GU1i61y1BI7C3bevPd1KmITKcxbv9u6jFgDgQW9/qUqvBBTMSinMlYPn283fuW1Rv+ZiMrIKPkpoJDc8BDPCgGoT6GASlFI/rgKM4CWf9BMKx8yzRa/cgQ1WHvuoynsP0ReiRACNVuEEKjzqOHqlKOiBBqHKht+1HnJufonSofOJS/nucpaRH4XKW8xq4oxUQqHzOB8lhsxKKRCB+dU7EFUbMLq3TkiF0GIEDjm9aICQ0CuL8B1Cs6xG7+22mZu2GgVtWhbqMalNXXOdq4YsdTKR9RZ2chVVjF8Ge95CfdfbEV637SSauEDMpL2IFJIjUD1170gHj03cZaOALLFhy7B7KNMjF5jJeM2ES/vjHLXdewy3vdsqxw9384fscKSsShSCOcCBEfNnUl4ATxMYDcfgzAa3dO1PoTi/IDgoyjpPfya35EpawHE88jvt9nZw9EKaKTKeAfFIxZTfheQJtI1fK79dsp2RdAYRj/db/euE/b+W1+xWZsPojGk5pIgP3i0wR767Tq79v5NVh/n+VKjVPqFcaQjW3mc9MYTKznXB2UCUkhHMm30QR2NMikCUijEvcpifq3lnahP2NkjeTHDlqP6LoMUFtECL6ew0irJlACFsHsVLFl67QYbeO9rduU3t9nVj+y2IY9utvHff9nGPbLBrvneazb2sX029pEdds1DO23Y97baKGQf+e5um/Dd7TYOXPfd12zCo7g9+ipxbLErv7XFhn93i41+ZCdhd9iI72+xax7egv9X7QbCxnnhJL0xwfPWHLKqUTNdAS0dCvFQ8IrRYkoHLOb55lo1hWvMW9jRqFlf1z1UZxXq06ASuiHC/kuddlOgVhZNSKQQDEkGmsL23Rp9EHmIGAKVP2g5pWmgKXB+1ug6u570X/fDbXbdI+Ttj16zax7ZYrd+bwf5sMNufGynXf+jXXblv++0kZyP1PH72+xacAO4EYz94Va78oc7bQLhar+2znrezHscDVk5FV6EAyFABK4SS9NTxyPmzntum2bHG07YtkNv2s6DR233wSO288BR23noiO04eIzzY7ada2H3vjdt+z7OIbr1B9CAiLcADU35oEZBacnDDCjAtOw6foZtI+wOwm0lzLb9hN1/zLaC7QeO22v7jtlruG85dNy2cL2d8537jlg81XLqnzQzDeOpI3zequ02/rMv2ntuWmAXjplpPUdOtG4106zHiIl2xvCJkNpk63LNPIiMxmHoC1ZV85J1HfKSVQ6ZYmeMmGXnj55p77lujg2/6y/2zPMvW70mS2myHK+/2TtOB6TwnT9sszNGrcRs0NwbGrDa+RAnjWHtYkeiv52yQxE0hmkqS74dOXnEHnv+DXvfnXXW+ws77H13rbARn99g0zdrHkvQrxCQU/ZlM0ruwHPXe+/hqPkK4WiE5ijoq1Pa4q3cPE1cggg8Zz4EIxHyE/cvs7yNW/ZYt1FrXGtQSuteWLMMJlzBS6ZQ1cLuoGzEMntx42Fe2FFsjpNkpma5wehkqqZzip08KnAMWQLEyXDf0/ipZtlpxpWHm0clj3HUjDcNz4jV4hw1Zu4BHYnPVxwxoA7Gppliwpy1h6xy3Oyg5eGllA6mBaVCVqKFVGCmaALUhAffyo5Gzz7yjfWucKhPQWRQOGAZFSMgBXWcVQ+bZgu2HLGG1NDa9r2H7ewbllnX0Wq9qUBS910fizra0C6w5S+9a7Ul6k9QUOtTeaAJZOQReaWZgckErYnyjdbGV6uTCHqv3exQl1fKV4CpFXMzEPHL+5i4YAfkFcyhUEdoIfnlnjM1UlKAhnHmsOmonJppyPuRVqa4KbAx7hXTkKXeNTIv7llDw1H8aGrtCWuIxaxiCBqTSIH0qD9CWkoRcRajSXW7bh7PoGdr4NmULj2vZsUGsxfdx1d1Pxe/1hYo3SfND2ewUjZOxE/aT/6wys6GbLsOgnAxMSqGTLcupKUcbUr3K0VjqkArkulWNHoVmud8K1F/htKn0ZbBU5xGWlgz38rQ7kr7TbUeNVNoQGbaVV+ZaQeOatZsMDR7Ciij3/jtJuuJplA1fAHpIm5MhyI0Yx3L0YIff3GTCk9jmPSypJ78Y7wLz+VpUL41o1H9C7G0MJnh/hp5iBOJW8jfYKFUQArqTxApXAABVEEI6kPQ5KUKjqGmIFJ4j+Wt37jTegxfBRMuhwzqMAk4yl7HTHBDMMOXUNmW2UmNuyeCG+qX+RAdkYeIcs+Uz1190HqiDVSgKXQdA3ujLqvQV2L/VmJSVI6Za9d9bWezMOnIjK8teSZUKe/46go32UqagutclKZAi+vMJypcVc1cW4Sm0KACT5hdu960MsyAnuNVGWlFMTHU/xKM4dNaU6l63V1nJ6lsmff7a+E1YCUOo5JSmfR8KsyBRiNSmO7MjR7cX4TQUvhMqOXWT2Ps3smEMwOVD0Vu9IX0ozEUy+QhP8764PIW48iEfqfKfTsMwfUe9RKtPloZcZYMoYEaSJ6hdRWRd6Xqr4BQJSvSqJj6PUah4Q6RBol5Jr/q5yC9JUPQgMlzmWGlEEUVcRQM1SzU+dYVwvjfeVtbeAYAKTz87HY7a9gqp4k6k7hmkTNxi4YtsCpMoCdePNV8aBZHBqLccyUPQCNdv4L6ehG+MkjBP49y3NSx6JuGJENS6BqQwrpXdlr3kWtJLCo5GV+E3VcyeCk2P0xI5SuvXWbFY2c3u6l+6dcdlYeIcs+UL1132LpDCoXDFlnlUDQFWo9CVPkqWu5qdf6Mnm1jv/rWTl66+8F1waw8mQ8ig8EqiPOxl6lwtCTltJ6LX22a0bhz/34rHYZW0HcKBCItgQKrXv4BwXCcKmbv+5aj7kW0Vn8FYnbcumOrl9ToOaXZBMOmat11XawKPXqGa5VbCt8S9NP6D+94HO0yiFt5oZGloiHqK0LNpvU+55apLYbPhH7p18rj42ikPYZOtKqh01wFV8ezSE1zItTnUob54/q/NFQKObhZsiK70Sswf9EK0MI0e9RpZDJt1EdGmjXnorgPWkb/aZY3aDL5Md31D5QPW2hzXzvEvTOIGVL40ZPbaGxWWiXvvAC/6jMrACWQlfpBMkcfMtOTiSj3XMkb4R9AUw9Nh2BoUmg+JKnOxnD0ITiPJd+HpvDyDrugZrVVDl8BA9ZBCJgOAyEFiEETS0pRxyqphLHkG6hZgTof9UDZykNEuWfKF615A3V3jjNzSmF/tU7FAxc4cqigcFaMnGJXf/OtMx98WtR7vrrKkYIqlHrYC2Q+uE5YWipaK2kK8zdDCl5q9GHPIdTO6VaogqgeeI24UFCDTsWpVkg8vT+BpvAWkIIfP2HdRyxAU0H1pbUtlrkFeRXxnNIYNGJSPHI2pkH7tRT9nKZwLO60s/IaKqjiV2ezi38u5twCO/e6ZS2Gz4R+6dcihbseXGrlxFOmjkner+aClKjjG1OgAPOhtD9ajuvoFllICyI/OS8as9qNnqmzU2SrWZzSGORP6VXfSlEfkQrvApNEU/hLB0rzW2Ln1c6xw9KYwj4NgWd57NcbrWxMnXVFY3ad40OXWgnnJWgkZaMW2FMTdzd7/sz0ZCLKPVfyED5m2Un/bXgSIWgSkzZuhSDc5CWNOIgUtJw61BgCUmjwh1je3kMnrMfotbD+CipbHQVYfQqaN7AwIAcSXz5yqe08rEKujhk9kG4c9uCmISVvkulcaJ6AcM596CdIYOi3yV8gb7qeu+aQVY9GBYSpi2mhpbYWY0+WY8eW18yyKmkKX3u5WZh0ZMbXljwTjhQeWE2Bo3C4eQoaFqyjklNwNa6PBlBBJZ+zWVtzB6s1t71+kNZ0FqSgIUYRSdB6BX0KFFgK9eWfWOHGtDPv91cDUjh7wjwIU1qBVOzAjJDG4NYvUFlKIQV9urzF8C1AP7ct2PEYpokWrykuWmmp57wP9SkUDF1kZ9+4tMXwmdAv/fr48Xq7mDwskf0OeZWorwJ13ZGCuwf35B7qVyrkPZTRGJRCxIWaek6Lnl+L5oY2IbIt4B0Vyfyo1Yha0J9SgqlR5ibIoWX0I/2QujS9EsL/8I+vObs/fBaV7x8/8aqVQgplKmuD0aSlJaZGU8pHzkFTaL72ITM9mYhyz5U8hI+pX++/A08pUnDawRlcixTC0Ye0yUuOFDT6cI1mNPp2xoiXrVjzuqlobh3CQCrcIGUklQ81XaMPpdhxH31okk1dsM3Wvbbf1m05ZCu27LWNWw/Z6u37beMOrrcftLVb9tm6rQfs5R17bOO2/fbK1n32ymsHbRXq2ctb99vLrx60nXuP2EnUT5GDj5qtzsqk20CydVJY9PIeqxj6CgSwwKmPmlbrpjmjupYNnWHlw6fbhG+sbRYmHZnxtSU/BZDCB7+93CoGQQoUOjcVWBNxVOC0NoRCW0kLNWujSCEYkty+5zB5KBKYCEQkIgaOmoegPgWI4bK7l8LqaS1UrhA/btVj0KLIq6LBU61sOJWNZxGBFco2p3IVDp/pOv1aDN8C9BMpeMeOudWfaj01f8FpbZw7u7t2op1zzbwWw2dCv/Dcj8fthVlbrceIUJORObYQzUbDmdLE0LjQeLoNX2w9x623bmOWWeU14Oo1VnHdBiv7161cb7HS8byj8Sut6MqNVjJ+oXW5crV1G/kKGt4MK0FbqxjIO9ACrf6YT+o7A2VoNx+4vQ5SSCNIdTT+10rrOmymVdMQiYQKhqOhcKygvpSPXGhPTNyqBDSGSU9PS4hyz5U8hLY5OOn1wRPaAWSQNGkKPThX52NXSED9CM1JwY1E+D8IJi+dj4pZUrvamQ+FmA3SEKRaubkJmsSiqc+DYetBvCgypNBlpmzieZyrlVAF4YUNW801LQUtYQnqWTHqcc9amBr1rpjrokFaAowNSmEsQY0uQ65JM92HT7WbvrjGXpy+0RrX5ycblOxmCZ23dp9VOpbW8BCsrR5oNySp6cVzKPQz7KoHNzQLk46ojIySnwKRwkOrrFydWhRQaQaFmtotchiAjeueY6bNe/Wo1XvB6s7tew9SoCmEGn7UhCFN8NEQIaSQpxar33S74hOLLZZaMtwxNCfTEPFEDJISaZL3PFuxVkCKCCCFElrHsmEU7nHTLZm2PL0t6CfzIXHspJsvIq1JoxhBJQ5MCS0hP+fauS2Gz4R+4blGta788gvWfSSVl0qqkaVCnlt9AiVDqLxoJW+75WXbdVzfXNTIlXr2QVy9+tqjgUZG8xY0WqJRG9fzD6jcJ5LH7ZtPrbPqQausiyPGmZRTTKpBmAPEXYKpUoUpdDSWprER7lvPvmJnjlwS5KPmZ6B1FEF8WpRXPmqxPf5Sc3M1PT0tIco9V/IQ2gvjpDcST0F/gjQFkUKwvLoFTSEZ7LeQjK/R5CXf7nhwvVWPxExA7SsduoyCox711AQmKp17KVRCNyuxH4XAzZDTZBx1mqE291GhmI9dh+qmmXuXQxx9sdmumGFVtOLyq0UzkrlptppQo5l8Ur+l6kE+5RDTmcOW25lk/kszt/OQQUF3a/9TCZ21/qCdMZyCqMLNM2mVpAislHjLKJhqCSd8aWOj/0xEZWSUPBMyH2765jorw2TRJKJCkUN/TV4KOvDUV1A2eIbNdfMUgkq+Y+9eyFDzEyaZFou5ZdGaBdj7JfINE4Jwve9YanFtxqFCnUNMXIzqSx5p5mcR70G2tipunlZlorGoZe9+zQwqjzYKaTnNmdDP9SnUJyAVKpVseeWFhjshn2B5dZ2dc130vhbp0C88136H54x41rpoGbzrMAzIplgT3yiTJcOm2sY9eyC76NGS9PjSoWHwBhqaSzChupLuAi1i0yKzfksp7wvRNNXozbe9hwINz4E8/PYzG6wnWkFl7XyX1kLCyqQuxX/lyDp7/Pno7ye0hCj3XMlDqNP0RGI8nprMh1BTaCKFoE/BbbSiCUy+1j7EAvNh474jduYYGHQ4msJQdbwsDTpsBixBzdI8da415dlNcUZd1Jx7TWXVVGUqRV7fgBjyhsAymtd/OdpFP8hES6dR7wvdoihesCbPXE6h7IXqxjG/N3Fqjn7fOkdEFRSucs3kQxu47rOz3dr0hJtgEiRUS6fLNfog+46Xo3X/RX0hLCpjKepw1bD5NuLL6xv9ZyIqI6Pkp8K3e7+KWio7GnXczUTk2V2+iBQowBXY7nNePUYrFsxT2LX3qJUNIa0QgJu+TGV0Mxp7ab0CcfSZYeeOXG53P7zA7nt0qX3mO4vsfkyUL3yjzu7/zhL7zL8tts99d4F95rt19snvr7KvPLzcPvXoIvv8d1YiW2pf/tZa+9xDi+3T311jn/reCrsP3Pn12TbwrumuQy2YVi6TRUOoPDcEIXLXGH8JKvGld66wRGqouT3QLw4p+Jh/PUYvta6jsOvJ91I0RzdSMJT3B2mfdf2SFsNnQr/w3KdVrx471apHzEWL1Pul3PDMhWitxRoZQ35CKwzTwmciPb5Mucr64OvmWw/3/pQPmlNB40d+6H4a/tx8INhoxAH/P35im5VSN0rRgMrQKEpHLbMKGtCuo2faGVcusacmN5/mrF9j+BYQ5Z4reSMwCeu99+Ep1BS04AkzQh2N2pUpNWHJ7aWg5dVeMfXtn9Gq9qeWTsOgn35ko3Ud+bJVDl9jZbXLeQloC+pwhPXzBy/nuJhCr84eyAJNwLU2EEF+P1rKfospdFTuGnXyoBr3CTQKTXctx1zQoqd8Kq/rfb8cItBCHR37EE4z/AYsppCudGp5oRbeUMErIIf7frCAB21ibs1o7IZdWORUdbQE/GphVRGVs7xmJnbedBv3xbeuT0Hq6X0PrCVvuP9AKpyIAE3KVTIKrjrvtOHLwo0yHw67MLv3vOlGR4JNVSABrXPQ+LkIwa0wJC96U/B7T0WTeAE/Mi9mcK7xeJlpwFUMTcYhXwfhBgm6pehakIbWVdAfLQRiEklKE9NuVuFMRj2jIwVpZ+rg1PAd70qjEGW1dXbnzzc1zj9pD/TTJCfvRL1Vj0ZbgwQEmZAl5Iubco1Wedb1q1sMnwn9wnOpvN3GzbAeEE3XEYtonTXtHW2T6/KR86xswgtWj6mQHj4TxHaqnDIuuUyKD31unp03apZVjJpvVcPnWzWVvGrkAgiOij5qib22L207P973j55Y7kysyhppRJhHI4LZtKXUj6qRC+3pyZgP+AvDpKenJUS550oeQlsWxvy34ylFClbOueYpnEtOhBOWpCkEm68kE10o3w/grv0UUpFo/f9HvrPReoxbT2ZRQWuXoTVoAtMSK6yl0Ncs5YWr81EdM+ptp1BqeXU/mRiwOKpXHn6kQkqbUEXRAqpqWg1t2KKVlW66LWRQoEVWIg6ZHorD9V0sd1u05WtePqpuyQANK62yfSfU8RNk+pzVh9w8eU0gkRqsSlBIXCWo85XYsaUjZtjor791fQoihXseXEtB1ZwEWn1pRVTUYCUpeQIpVA2da/M3HrOG1OjDa3sOWxGEpUquZdH5vSAFZz5MgxyB9kvoRR70nujSnq+9ENTvoFWQWiehyiy5W+ik/MJdi6YIL3eZZIG2JXcRjmQyz3RNPjtykKYgMsBd70dkxlHzUJ5dgumQtg9mW9DPmQ9HTkDCGgWAnCFC17/kNDgq7+A6O/vGaDMuHfqF54GmMM26aaIQ5UdrWtRvpElieRryrZnkSCE9THbw7LbPP2dn18rcoUyTP0WDV1KW0ALUZ1Yzz17dk2Y+gB89s8qKJ0ylfGkm4wJMmGCKcxllveuERfbUtO0p0gmeKTxGIco9V/IQHppq3DsXTyIFdSymSMF9bi4kBWkPASkktGdj/HUXtpEUgoh8e3zaIbvo2s1WftUSKxu5EmZEZVKLgGlRrJlc2FVOdVdv8DAqhAhikHpkeYH4Lx6qiqIOJ8LQenbVUBFHVRqNi0vTcKssRQhaaelWSxLf0NVWopafAl1IQZY9WYSW8oG7Z9AyBS9KmoIqvuxMaSfqUxAplaXMh4rhs23sV97KpdNJ+9gDkFeNFv/IHKDCOdNJzwEx8MzaX1L7KdSn+hS279cmK1OpyNIUgoouEggqP+dukxrCaw+EcEMUd66l1TKPyGeRg6vY5PcVk7mGBEQoaFzOLpa7NAbN7NNS9Cu0ByQkLMIVYTlygBCkKQCZFCW186z76Do7oqnrWWoKGn2IHz2GVklLPjQY2hRJhygeNM2qrl7RYvhM6BeeawrwWSOmW9dhM1xnpevMlbZDujX8HIyYTMMkBcNpOGRu1k6zsoETKW9TrWyMFuRBVIMn05JP4bkmWdHAF/AT9DlVDp1nVQNn0FCRv5oCLZOKBilfo2yDF2E+LLRXD6RrCkl74PENPM8y8msu5VGTlpYC/FMHKkZjPkxqvv1fenpaQpR7ruQBfCp4DFI4D19hn0IXd27Jizhv6lMIv1id8HubFwtGoZqRguug8ny3f9zctcdswiNbref1K636qvXWbfwKqx632qrHLEO1W2hVI+Zb+XiN1S538xg0zqthoOphddiYCyGDOY7xe45ZaNXDUQV5ySWEKavFLyRSOGgpZkLQgokUNLpRrsqu1g5ZkSagoKJ1HbUQNSgYJpq95iCkQIUcqAJOQenPS6XSFPefib03wypqptmVX3grd17y7O6vrqBwcF/tB+BaYTQkBxHELAroDJvzyht2MjWjcZcbfaBVh0RUeQMiEDEEeye4zUmo5E57uFT9DCKDJk0h2BKNyq3Ze9JKeknOveRf2oBz54gZor0P3KYoclc/h85FtOpHUJ5pzwQql2ZellHIP/X4FgoEWkKa+tsW9NOMRvUpVKgvATtcRCCiDiquFoXNt7NvrWsxfCb0C88TaArdR0227iN4TrRFt98j2lc+DYmW4RdBEurULOk3nXtK+5pl2oOjUDt6qcHRNGfSVqhJS5CA+nikvRWiERWorOC3mPwoG0TeYdJpj4pgpA0igzA0x2TzgbSRGEjh4cdfwdSgTGvUTf0c6mis1eS1BVY1eqlbENXoH6SnpyVEuedKHsKLrXYdh02koE/GafJSOKMxMB9MZOF1tYQ3mffaAik0QepkArvkpHlaZBP33X5++2GgbX7C9tGy7IY8DsWStpcCtY/zg1SYnWA/5wfc0bODCc/eTPi2l/M94FA8aTsafKt7/Zh94skd1mU0ajgvT2aJluWWqf/BtWRSkScH6tqQZXb0zWCYaO66N9yEmRJaJ5kn6lGXilnMUZpCce1km/DAW6kpePZRSEEFX7PrnFqu1leaDRVDBCdNYe4mSMFPkYK2YxtIIe07icKKf1fZqcS9JqMNQAzqS9BoToowtNmt9iRw5oWLW8QpjYqKJ5MMEizSNXEUpIhIfmTOBbsk4aa+Hq41qqM4gkorQqBiYQpW0vL1+uR68+JNu1q1F/ppC3vvaMLZ5KVDZruK4rQEdd5RWYsHLrIzb1jTYvhM6Beeq6x1GTHNzQsItoZTReZdD8aElcmjPIJ0SyABaRIyM7X2wa0jEQmMrONIg6MO1kHS3shHyCBfZvBATTKTG5qESAHicn1BA7QQENOB1r8a0+/VfWkdjZT3R379spWOWWoVuCuNGo7UDkwlNUusgsbwN5N3KgGNYdLT0xKi3HMlD3Ei/gNLepgKjaQgM+EMSEFrH3Sujkb1KZxhDdriXQ1vauJWi6QQ3DB6rXmmvNnyT9g13c3J9ZchE3YdiZG5y91c8mIKaqnURRVy7EgNYWrCSjH26erd+gpP0uasOEChgURUAActgxBgeOxNbYFeosk5EMbYB9edcp8Q7vmykJ8CiO36h1Y4VTR/oObWU4llDqlTVS0zz1I2eKbNdlu8BybPDjQF7YCsDVvVr1CgPRJlIlyuzsFUn4I6XEUEIgQRgcC1M5PUUegqNvfQMnZatWD/hhCBuxsKpLV0i540/6OmyczTDNAyNLlyNLeqsUut9luv28lEx2xz/UQKiSNxK0UbLCXP3dRpaX1URj2DJpb17MCMxhgk1ZPnloZZTIOgNSIyEVXBiwcqXdIIZqBR0ggMg/xIp9NUSHu+zJhxGj1TJyD5IfNjKHk6FILRvh3kpfb90IhGFc+oZy+EGMpqlpEv890mKlVopVuakULS/v2JzVYydrnb2Uv5qf4sB8wIrX14ZmrnNB9OeAPxgHaQWvcQjD5oSDLYTyHY3h1S8Lj2nqbeNsXXCim89Qk4TsWpcBOisNmGrURTUMsIy6uyUUEKYWUx86yXgw6Q+ZBC5WhMC+1nIFU1VWj0LYoSVPSy2uet9otv3ZCkzKuPfH0VrQ4FStuvazRB9rqz2aXioynwHAsghYbU2odd+96k4FGYNdKgTkK16uoToKUPdkuiMvVd7iZgaa1JMaaVJolpA5lKCp56uosp1KW1y8mjFWhOy11BLsO0KtXMTtTe8mG4a4/NEYsgxsVoUxTa0Trib+RaO2PMcjtj3Aob8LVXbdV+7QCkD5S0v3MxHfqFmkIl5qBa7EJpblQ0EUKgRc2xc2/oyDwFNIUJL1rXkcSnd6/RKLQBdWBqspBmZapiVmpzFlrvyhFL3fcXKrWseRSVW31h45ZZNWkv00KwURDiyEUQ4WoqPC07+dOd/OkxGoKEQKpGa5v2ZVbF+RnjVlr3CStt677mMxq/9auN1n30WteB7GZrDpXpFWgWldznmRm7lIDGMOnpaQlR7rmSJ3hmzw3ln4tWoAVRwUKokBSSSfUz6BptwS+xuFfD+V7F1hjH/6+koPX1pdiIjuW14ITCpIVCqiway3c7DdFyzH8l+OCGtmOrrn0B+4/WA/VSHZLqgNMoRCktdGnNVOv98bd27cOtn9EQJCqs1FZ1HooQNDToWuyZqJnTbeXW42gKKVLYc4Q0QnSOQNAKeGa3n2X/iVQktA3CnHPlErvvVwfszt/us5ufBE/vtw/9Zod96KmddtuTO+2Op7bZR367xz78uwN2y2/22Id+d8hux9+tT71uH3/2IG6v24efed1uf5rj0wfs0/+1xz7/p0P25OKDNntXvW0/VO92+dHMxXrSkJmubKCfI4VjnnUZJRKCnIcFGoojamkrENXZHZi85Ptx63bN/1j1SMwGNBttyqvORg11ypTs0n+lbTt63N44etLePB6zN4/F7Y1j9eC4HTxxgusTto/zw7o+edwOHK23vUdO2sGjcTvw5gk7cOS47T9ywg4Rx16w/+gJ23+8wfbhb9+bJ23/vno71pBmUlHBHnxylSPVasqhtmALtmLTDlWL3HyFP07rXAuitEdFQ+wPPLsqv0ggIIWk6eOyXNuFTq7ORd8/l8ZhDn5lnjf1KzXvaEwdCc2xJfMhFfAUeeDmwqWbD+F5i/4BLVZxLZVErQA2Wpk6lmQ7UnHccCOtTiGFQR/nlP+1O/ZaF01i0U7OGsakkmm8XpuEFlG5Sqh8lbUz3YQnterp93Jpi3gO/YLzNjrcPN8uux0zpe80Zwq4OQfY7kGnHhoAGkQF6uyK7cfdZiQKs3vvIVoX3DRagUbjiMGFCWzmPLSDD9yzGrsu9/spvBXQL5HUPIWY+1JW+XDMFEhdk6Gceo1arqG9C2/uACnEY9ZzwkzrMWKWFY/UKAaNA+aC6+1XR9/YqdaQvoqxBaTH99fIQzzyy6VWctVcSGGRFaGBlaCVNI4+jFxmv5up3Zybyk1b8UW550qeSB63eq8/ZV37KASfqA+Q2k9BpJDsSYNcTZm7hjIdjJLpF8bhSEFfxk0AFeRgzzj1SGvnHe2oJHdVspjrbAzOgz3xNDSlXYG0u47kbg+BlF+32Imw+lpvAr5QGI/WUwUqTvzaYenKT0+hclOxNG1ZKjGVyvUyY/fpozFahqs+hTW7AztvD8xerRZJoxcDluIHEtFkHXW+ORMi6HhavOmondACK82NR01OJHi+xFEyQjv78Iyevv4bpCvYzy+1rx9p1jFwI4MIL3XM5RFp3PH6AeJ/jvtrazUNMWLuaL4FRBZsXDLTKmvm2CuvH3SqsMLt3LvXaTCF6jwlbYH9r06wKa7Aay3CpfesdBOC5L+zQz+3exKaQjUqeSW2uCqJoP0kNZGplDzoeW32k5e0O1f5uBet+0jePSaC9kTUfg2aVqwZr+UDN9iuE/WUraATtyWI+dOvT+3vyiB+/Uu/zsDDP1lvZVetsGoIwRETJohWSZYPq3Pmw/+btk83bPTv7pN2nYko95zIqZN+wwHqlkYdIkgh+TYqYw+I4x851+5XQX7oF8YDKRBRPGHj71lqfT5UZ5ffscguv63Oet9aZx/413nW74OLbeAHkd0+yy69ZZoNuGGWvf/G2XbpB2fb+2+bYn1unmv/gvyyW/9k779nlr37g5Os163Trfftk63XzROt9vY51uuDczlfYJfeMMX+6bop1nPwC1bU+y9WpKnP2i5eKzMHraRyU3Fka6cm8Uhl1FbaB1Ljpyd51m4UGA01aUKU25BUPe3Y6Pp0WYHWyfeZzHGq9Rj0F3vfDS/Y0Jvm2WU3LLArblpk7719nr3/g7Os1y3z7AM3zLPet1Ahb5hjH7h+jl124zwbePNCu/SmOdb7g/Ps0hvn2mXXzbX3XrvY/vmaadaz5r+pxJrJGZgC+ZdPsuCbDJq8pL4QdT4GH4PZ8cYeiCd45l17j7iKkq91D+o/UCei60eAVAaSRipSL5EChBu+lM4M/WQ++JBCZa2WZQe2dth6akWoPgd33i3ZdzR6iWN2yQ3PoylAnMOogNIWh2AmqmMZzVAdjH+eo818UxVblcA1YCGJh3I1TEHD5obZUyZTsCpX95I7fpHzXyoO+ZOs+YzJ7/ziFYhqFWQPGQxFI8R8cN9/qFls1WOX23/PaL6YLD09LSHKPRdyn0avof5DNNTn4qr+hB4g1dHo65NxkIJ/CQ3f2ebFFjQLq1947qY5xxri2E0LrQrbTfa6W+nmOnZkJ0o9XBDMLOs3nRZ5hhvycS30AC1I0nci1CNOK6hp0bKTqdBS7UtoybtoSOgK7H5tBa/KdAWqsybs6HsEkILs64IB+gDNcitSD7w+aKKpzxCD5rt3HbPKEqnNXdT7Xz6e50KjcMNLbjow93YzAAmXGtbTtxS0+EiTf0ooSEWSqRJyf/f9Sp5Lu/O4bzFq6I9nKaLFL+6nUQF1csruF+HITekhfoXrD4H11jPznJo8dBnp6KNJQnNxI8yAKXbmmKloThS2VCbv2HuUwsR9uJ86IsMhRPftC55fdviln1xBmFQaOzn0k6YQP56wyuEihWD0QYTgTAhIobRmpv3DjdpRuOU40qFfeB6PNdhDP1pnPUehdQ3DJFS/kWZLUiGL9R6HTLeS2uX2oe/PspOUCbdnJS198GVutDpph8QjuZYOuwbPXYf3k29psZBCeM1Re4kGS/iJJ70DlrrxxV+utzNqtPOSpjfPsxJtYMzzqC+lasxS++PswySgKQ3p6WkJUe7tkSe012ML8gBaHbqFyq+l0U07LjWhK37OQmO+hDT+GTQnP/3C8zyx54mj2IfDFmI3YatLVdOmrSD8wIkqoCv0VFZXYVRp1YPeD3dN73Xj6FR6VH19VkwfCCnQhJzeqPSOFPCrz8ipkrkFUap8IgcqkzrqVNkGrKBiItcqQnU00kqU1Ky1y+6aYw2pBGhi1agvPwthaQw+NSEFknE9+330zQSOvTlqctAVqszYpoN4Dq6D2YSaiah7UEk1UagXZkCvgIgcGamyy03zCC5VRyLnvSATTRRyaxIgAE0v1vcgr1A6afWv0MxMkQLP23+p1X6mjgLWVMF37d9HOrivxs61cavbVZlw0hw0QQt7/LJPr7KG1LcnOzv0cx2NDQmrGoFdTeupNLidnTADnaZQM9suvCl6unk69AvPtQR6ze6DdiYtc8loNAO0EE1W0irGYk0cwtQqQHNwQ4raXXnIbKuonWFdBs224hqutYeCnmfwZCvUVOYhED+ErH6P8sEzME+nWzXvqSsyt6p28FTrRrjy4XPcHozXPbzMGtJXYEIKX/4VJDV8BQS41MrwWzh8sRVr+TQmRMXYxfbcApFCy+lpCVHu7ZE3akgZck+amxe3+vgtPHOThpCOpHc2bj0s7n0bv4c4b66Z6heeQwqeHT5wDFVwIZmk3WykylP4NfkFtS2YK68xY46uFVbrrHMqeh8qpKYr09q7yj1wGaRBpZQJIC0AIihyFZVrVT5VMshAcn0VKZ/wbjZgf8ho8GordySEG/dy9umoWfbc1uNkRioBsPhBXlT1CLQEdTRCWIX9ICzMiGJtmuG0AcjAtfLcF1LQRh1uBacjnIAU1ElYyDMV9JpkBfrCkSYSuc+sBWG0ijPvUgBRaITDfZPRzUkgrZBO8AVpoI+tyPxBU9L+E12GTrFnljdXJzV5qRRtQJ+ID768DFwnIyQzSNN2Z9kVd9fRCkTbyZ0J+rmORrTLquFzrUqjBBCBZnnqqJmSRZgVb7s5ehQoHfo1XvNu6yn4l16FzT5msZVR6bUpjCYKBQvOKGfcR5u2qq9BQ7xlQ9EoaYjy8Zc/Rit6VTZ4d8jztGhtEI3MEMoJ+a/JboWUv2o3hMozQ9JdqOiKS8Ogn3tyI2p1Wocvz/OlX66yHpq1W6vhYchpNFrCaEhpeJ2V8Yx/nk8FC/2DZulpAVHuf4084Wl/iWk87z8gTE1nTieEZHdLQAi+dwd1Scv6m2sJgn7hOaSQtNf3HLKqkTAtrW/RoGVkJKSg9QwDgkVLWlqa109z/CnQjhi0Z0JQIRx687L02TJtOOJabEhAFf+y6VZKZXKfRpO77Gk3USdFCm71JCSB6VCMilYmAlJnIy2BbNTz/3WdxUlE+LAisAbswPd/hhc5YrLrkCyCVGQmuO8NqH/BdQCq4qO5QEwl0hS4h8hHsnCtgDMJeL78SwMCc+aMIxWlkQKFmSCSCNKLP8VH/O5DKm70ARKR34Gkn0qv3Xh60HKEn1IPsVOjD8OoMNrUA3MrnJCkwlo0ZBrpnmOX37uKdJ76ojoj9FMHs3/Sg5ypYBBDsTZw1UQm0lI+fCEt+ALeXce2Y5P9/4c5B63r+DrrVjvffaSmYJj2Cw36FlT5tWmNyofysYjK71aEqtyMWgUZaJMg8ldDxuS5G+HR9ys1wYyyXATc5LMhvDvCBxORFrnh1b8sP0Sr29QaC1/+1cvWnXgrhy/jXdW5+RAVw5eABVY5us7+PKv5AqrM9GQiyv2vkScSh9Gy3sl5+gdgzrRgBOJM8/wz0BBuJW/RRtPCpUO/8NztvLRt5xskUNM9YWQSnk8GFLmdnbH1IQftraAl0u7jobLDldlUSLXweX21/FkmBBVPm6wMeIEKxItwIwioaFKZnQ3Ni0Pdd9NwpYa7FX+KD1LgPmXaRlsvfMhCqxywzKqummnrduobE+kvSee+7Tt80KpvrLNy/BcNXEwroOm8FALZ7BCL7qfVmjqWqHPIDQGq159CJWLSrkcyCWRmQF5uQZPrrEQubcY9L2kUIUjrUaETYWEzO+JwX4PCn0iGvCkZDqmN3WD735AJoM6rpgze8/ohq9bQGq1bAeShTlL3SXjCq2WVatvnk6vc6E9TOjsv9HNrH076Vj1yPi3sfCvSaslRaAxaIIUarslEF9+yosXwmdAvUyY1+bpvr7YuozU5aR4t8yLiVn8X70HaA9AsTc1I1KIomZp5g3nP2qOxRkv8eW/SFDRNWiNY7nOGSyACyJt3WYGpU0S8bm9GyEX7d1SOWWJbj6tPIq28yXx48hXrOXatVUEahdSPkhHLrExfzgKVo9fac3OC4fIQLaUnHVHuHZEHI3z6nsQYyOw8PJ6NtCsQKfTETd+SvAAtYrjbPEVpw9MpcYXxheeOFF7ZiqYwdrmbIVZEBhaO1KIf7KbBEAPkoE1XwrnoGiYMhuCoaAPxP1D9CPiRiVGDpjAY9VpMrWta1iptaOHMAlpqjRpoxeQA4naaiFRC2LsW9h21xrrT8lSNnG1drllp87ccg93Ue5w2wyyFev+kbXrtAC9rHi8G1kYFlD0rDSPYkFT3UEUMWi59GDTsNJU5pA+huFZHxKZ+ET0Hz1dKC6Tpwo4UgNvExbXuQWV223trGJGCWCjQApWPWGFV4zbYpLVH7UTKzEnP4B37DgTrNWSPiqAgBm2i6lRtKlAFae7/2dWuooVhOjP0c6MPJzzrNmaRdYMMKqTqj6ZyQRCaKtx19GJ750eyX/uQjoa4Z0++tMvOGr/CuoynIhKnZjIWaQhUfQkjeKdoZ5XScGnt84dRaSesQauQnPcLUbnFX/gpG7EcTWYlYRea9nyswrwp0FZy6hfQrkqU+54T5tgxy9DWZD78eoOdOXa9dR27xMpHrbCykTRGmj0JukxYbX9ZIFJo2dZvCVHu2crJIUghYfUNv6bsvAtS0DLpNFJI9jAvcTF16OPuU3yaKKhwUfGly/PUsq3dsNe6X7nCusOW5ahEZSNWwYgLaAGXulawVB0tvAR1JukFiF3LUOm0XkG9sWJQfRewYLQyXqsbFwT+qITahFOttWaBFVI5tNNvYQ0vCrWwTJ02w3jZY1ZYtyvX2/nXrrZhD+y1w3E0hORRPWazBw8RJMC3AxSc/l9aRuFcR4uylPjUKnB/DRlpzTsvvdvoeVZFQQmnpmpqcGmNCEKjK+oxx94HGnHpMkpq8Gw3DKbndyMxbshtPnEuDKYZOxV5jlWOokUcu9D63r2zcXv24LnSnzFpu/ej1Yyd61q8CrSCCvJVnWQVI+ZYBXZs1ej51vd+zIdUHJ0d+rmOLUih5zWr7AzKTbdxdVSapY3oMna+veOO6Onm6dAvSi6NIebvs48/vNnOv3mrdZ/AfcYvpUzxXrmnpi134R1oK8GSscus6036QvR6GgppF9j/lMmSEbiPW2Vdx+B/5ELe8WLMvIVWMW4+hLLQumGmdB+3zLpf//Kp+0pACt/4zRa74KpNdsZVdZDTKuty1RKrHr/cpfOs61ba/y7a3yyMfunXmYhyz1aufraG+BQIuqclE5fg6RwyLJjCbP7ZmKNnQhbfQVto3lcVFV+63GkKk5busjOv2WRnXb3Zel79qnW7ZoN1vXKjVV+FPXXlWut57Trrcf0aZMutx1VreBHreSkvW5dxa6zqaiokLWX1hLVWefNmK5+wjkrAiyMDu2GSXHDVMs7XWI8rydArV2IWrMc/L2k88XJ+0Uc22Uef2m3PrTlqx2OaTBSMMQs8ZrMHDxEmwPlLJGz30Zj9buEhG/P1V+286ykc49fxEnke7tnzhg3WbYLux/Mgrx63EoaH5fX841dCSMvceHMVx7Mm6BuIuOOnq5aJj6aVGkN6uS69eqVVX7PWzqA1qvncy/bYrAO25UCMl6Lhr+Z2aDr27N9v3W9cZT0mrHTLzys4VugZOO9+NfJrXraBX9ljiZN/Ox2NGpI8QQX6+u/22Ff/+4B96Q8cf7fbvvr7PXY/ss89/bo98OdgvUpb0C9KLlLQ/IMEFUB9X1v31duf1hyxn7643z7z271236932ed+tdM++6vdds8Tr9u9Tx+2ex7fY/f+5DW7+2c77M6fbLeP/2Sr3fPLXfaJH79md/1ou937g6322Z9tsvsef9Xu+eEWu+tXr9lHfr7RvvCfm6who19H9/zTvC32uZ/vt3t/ts3u+tl2u+8/dtpdv9hh9/x4m33mF7utbpMm1jWRiX7pcWQiyr29cpkMXjJuXsPLNEbvQvZ26swFyCAEyCDpV1jC01yEP3MOeaeNWAiZ8bUkd5OXtCtu3NNOLbTQRBJP1Lu17fo2pJcAcc3si7kZj56DZjGecNf6rqA+Hx6jdde3APVpbX3XUDs56duR+o5kHLtHLaFm7TUg87iPxly1UafGht13JDVLjviiHrRVOQVHw5UJnkUzGE/wvDGeqUHLvkmbp3uSnoQ2nkDWwLPpOTSrUtOLdYzxbI1QXiBTnmjlnmSatemRRg396FuAcfUBuELUek+uywflTyrOesXr7hNc6/NyGnKt/xvqaEy6Wa4eeXIUHOMdipyPkz+asapKLLRviNXF1065nyTfknoHCfJT03kxMRPcE8S494m4vnV53HzO9c6T8qsymVBntSqIZuQiJ69PurkNml2r8h98yzKZyCR3rpGdpFzpOx4x3cuVe8Jx/1iCe2VoeC09dzqi3NsjV+Oj9CQaNlJu3sc5JGCX8OwXkJZ/wM9ZPGsv5Gt4rsM8Z+vxRcndNOdMhB7CYyZyJQ8R5Z6tvC1EhYuSdxS5jq8zIddpi4ovSt4WosJlKw8R5Z6tPESUe3vkflINcB0kppEG9SNcACmgKSTfhttFNKqfcg12EqSHS0d75KdJoRV5R5Hr+DoTcp22qPii5G0hKly28hBR7tnKQ0S5ty7X5/jfREOYhMZyOddvhwQAhOD7aAr+B9DU/hhozNJ4OAbhouJrXX6aFFqRdxS5jq8zIddpi4ovSt4WosJlKw8R5Z6tPESUe5Rc/2SqnYx9DlPn7ZhuFyN/BwiOCe+TyHbbiQwzNiq+9shPk0Ir8o4i1/F1JuQ6bVHxRcnbQlS4bOUhotyzlYeIcm9Jrk7CeHyvJWLjnHmQFPx3c/5uyKAPpsKkQDNI6+gM0VJ87ZWfJoVW5B1FruPrTMh12qLii5K3hahw2cpDRLlnKw8R5d4khwhcB+cJi8emQwzvoeK/E33hnRwvtLh/qcW9f3edpdIg5D99rc2p8WUvP00Krcg7ilzH15mQ67RFxRclbwtR4bKVh4hyz1YeIspdPzdDUaMiiX0Wi30UTaA7lf8fzUMz8JLvghDuhSz2IzuuSE6JIx36dVR+mhRakXcUuY6vMyHXaYuKL0reFqLCZSsPEeWerTxEy+7B9OOEhhvrn6Dy/zPawjvcUKNGGhLeBPNjh9EMZCqcOlGuJUS5t0d+mhRakXcUuY6vvdAcjZbkuUSu0xYVX5S8LUSFy1YeIso9W3mITHcthNN8j1hsstXHxqAdSDN4nzX4l1gs8TGuX0MzCNbUuHkTEfFkIsq9PfLTpNCKvKPIdXydCblOW1R8UfK2EBUuW3mIKPds5SH0c2aCWn1fG6Nsslh8qMUT70OumYj/hMbwTTSDg5xrXYUmW7UcT6YsHVHu7ZGfJoVW5B1FruPrTMh12qLii5K3hahw2cpDRLlnKw/Bf25GZjyxweq92yCHDzjE/OFoDL+FCIL9GcJ4wmMmouQhotzbIz9NCq3IO4pcx9eZkOu0RcUXJW8LUeGylYeIcs9Wrs1jkok4GsBea2i4mcrf2006inl3WtLbGBkuW3mIKPf2yE+TQivyjiLX8XUm5DptUfFFydtCVLhs5SGi3Nsj19e5taO520A28bo1xD+JNjDAEolbIYXfoyG8ASEEa4rSw6UjW3mIKPf2yE+TQivyjiLX8XUm5DptUfFFydtCVLhs5SGi3Nsl93zz4ofsZPx+jiMghu+bn9zpFgOKKCLD/RXyEFHu7ZGfJoVW5B1FruPrTMh12qLii5K3hahw2cpDRLlHyd3KTK3YTRy0hsT30AggAv8VgLaQmorsdqHOmHAUFV+28hBR7u2RnyaFVuQdRa7j60zIddqi4ouSt4WocNnKQ0S5tyR3W8sn3rTjiefQBLZbzNNS7SNOYwj3NWgpXC7lIaLc25Yn7f8D0M0YT4CuvY0AAAAASUVORK5CYII=";
 
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    db: { schema: SUPABASE_SCHEMA }
+  db: { schema: SUPABASE_SCHEMA }
 });
 
-// ---------------------------------------------------------------------
-// Globálny stav aplikácie
-// ---------------------------------------------------------------------
-const state = {
-    user: null,
-    profile: null,
-    companies: [],       // firmy, na ktoré má používateľ právo
-    templates: [],       // 5 šablón
-    suppliers: [],        // databáza dodávateľov
-    zakazky: [],          // aktívne zákazky
-    zakazkyByLabel: new Map(),
-    suppliersByLabel: new Map(),
-    selectedCompany: null,   // objekt z companies
-    selectedTemplate: null,  // objekt z order_templates
-    lastOrder: null,
-    lastItems: []
+const PM = {ucet:'Na účet',hotovost:'Hotovosť',kreditka:'Kreditnou kartou',sekom:'Šekom'};
+const UNITS = ['ks','m','m2','m3','kg','t','hod','kpl','súbor','l'];
+
+const S = {
+  user:null,profile:null,companies:[],templates:[],suppliers:[],zakazky:[],
+  zakazkyMap:new Map(),supplierMap:new Map(),
+  selCompany:null,selTemplate:null,
+  lastOrder:null,lastItems:[],
+  orders:[],viewOrder:null,viewItems:[],cloneData:null
 };
 
-const PAYMENT_LABELS = {
-    ucet: 'Na účet',
-    hotovost: 'Hotovosť',
-    kreditka: 'Kreditnou kartou',
-    sekom: 'Šekom'
-};
+const el = id => document.getElementById(id);
+const esc = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const fmt = v => (Number(v)||0).toLocaleString('sk-SK',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+const today = () => new Date().toISOString().slice(0,10);
+const fmtD = d => d ? d.slice(0,10).split('-').reverse().join('.') : '';
+const setErr = (id,m) => { const e=el(id); if(e) e.textContent=m||''; };
 
-const UNIT_OPTIONS = ['ks', 'm', 'm2', 'm3', 'kg', 't', 'hod', 'kpl', 'súbor', 'l'];
-
-// ---------------------------------------------------------------------
-// Pomocné funkcie
-// ---------------------------------------------------------------------
-function el(id) { return document.getElementById(id); }
-
-function formatMoney(value) {
-    const n = Number(value) || 0;
-    return n.toLocaleString('sk-SK', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
-}
-
-function todayStr() {
-    return new Date().toISOString().slice(0, 10);
-}
-
-function showError(message) {
-    const banner = el('global-error');
-    if (!message) {
-        banner.classList.add('hidden');
-        banner.textContent = '';
-        return;
-    }
-    banner.textContent = message;
-    banner.classList.remove('hidden');
-}
-
-function setFieldError(id, message) {
-    const elm = el(id);
-    if (elm) elm.textContent = message || '';
-}
-
-// =====================================================================
-// PRIHLÁSENIE
-// =====================================================================
-el('login-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    el('login-button').disabled = true;
-    el('login-error').classList.add('hidden');
-
-    const email = el('login-email').value.trim();
-    const password = el('login-password').value;
-
-    const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-
-    el('login-button').disabled = false;
-
-    if (error) {
-        el('login-error').textContent = 'Prihlásenie sa nepodarilo: ' + error.message;
-        el('login-error').classList.remove('hidden');
-        return;
-    }
-
-    await onLoggedIn(data.user);
-});
-
-el('logout-button').addEventListener('click', async () => {
-    await supabaseClient.auth.signOut();
-    location.reload();
-});
-
-async function checkExistingSession() {
-    const { data } = await supabaseClient.auth.getSession();
-    if (data.session && data.session.user) {
-        await onLoggedIn(data.session.user);
-    }
-}
-
-async function onLoggedIn(user) {
-    state.user = user;
-
-    // Profil prihláseného používateľa (iniciály, stredisko, oprávnenia)
-    const { data: profile, error: profileError } = await supabaseClient
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-
-    if (profileError || !profile) {
-        showLoginOnlyError(
-            'Tento účet nemá v systéme vytvorený profil (tabuľka profiles). ' +
-            'Kontaktujte administrátora, aby doplnil váš profil (meno, iniciály, stredisko, oprávnenia).'
-        );
-        return;
-    }
-
-    if (!profile.is_active) {
-        showLoginOnlyError('Váš účet je v systéme deaktivovaný.');
-        return;
-    }
-
-    state.profile = profile;
-
-    el('login-view').classList.add('hidden');
-    el('app-view').classList.remove('hidden');
-    el('user-name').textContent = profile.full_name + ' (' + profile.initials + ')';
-
-    await loadAppData();
-}
-
-function showLoginOnlyError(message) {
-    el('login-view').classList.remove('hidden');
-    el('app-view').classList.add('hidden');
-    el('login-error').textContent = message;
+// ── LOGIN ──────────────────────────────────────────────────────────────
+el('login-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  el('login-btn').disabled = true;
+  el('login-error').classList.add('hidden');
+  const {data,error} = await supabaseClient.auth.signInWithPassword({
+    email: el('login-email').value.trim(),
+    password: el('login-password').value
+  });
+  el('login-btn').disabled = false;
+  if (error) {
+    el('login-error').textContent = 'Prihlásenie zlyhalo: ' + error.message;
     el('login-error').classList.remove('hidden');
-    supabaseClient.auth.signOut();
-}
-
-// =====================================================================
-// NAČÍTANIE ZÁKLADNÝCH DÁT (firmy, šablóny, dodávatelia, zákazky)
-// =====================================================================
-async function loadAppData() {
-    showError(null);
-
-    const [companiesRes, templatesRes, suppliersRes, zakazkyRes] = await Promise.all([
-        supabaseClient.from('companies').select('*'),
-        supabaseClient.from('order_templates').select('*').order('sort_order'),
-        supabaseClient.from('suppliers').select('*').eq('is_active', true).order('name'),
-        supabaseClient.from('zakazky').select('*').eq('aktivna', true).order('cislo')
-    ]);
-
-    if (companiesRes.error || templatesRes.error || suppliersRes.error || zakazkyRes.error) {
-        showError('Nepodarilo sa načítať základné údaje. Skúste obnoviť stránku.');
-        console.error(companiesRes.error, templatesRes.error, suppliersRes.error, zakazkyRes.error);
-        return;
-    }
-
-    // Iba firmy, na ktoré má prihlásený používateľ právo
-    state.companies = (companiesRes.data || []).filter(c =>
-        (state.profile.allowed_company_codes || []).includes(c.code)
-    );
-    state.templates = templatesRes.data || [];
-    state.suppliers = suppliersRes.data || [];
-    state.zakazky = zakazkyRes.data || [];
-
-    renderCompanyTiles();
-    renderZakazkyDatalist();
-    renderSuppliersDatalist();
-}
-
-// =====================================================================
-// KROK 1: VÝBER FIRMY
-// =====================================================================
-function renderCompanyTiles() {
-    const wrap = el('company-tiles');
-    wrap.innerHTML = '';
-
-    if (state.companies.length === 0) {
-        wrap.innerHTML = '<p>Váš profil nemá povolenú žiadnu firmu. Kontaktujte administrátora.</p>';
-        return;
-    }
-
-    state.companies.forEach(company => {
-        const tile = document.createElement('div');
-        tile.className = 'tile';
-        tile.innerHTML = `${escapeHtml(company.name)}<small>${escapeHtml(company.code)}</small>`;
-        tile.addEventListener('click', () => selectCompany(company, tile));
-        wrap.appendChild(tile);
-    });
-
-    // Ak existuje len jedna firma, vyberie sa automaticky
-    if (state.companies.length === 1) {
-        selectCompany(state.companies[0], wrap.firstChild);
-    }
-}
-
-function selectCompany(company, tileElm) {
-    state.selectedCompany = company;
-
-    document.querySelectorAll('#company-tiles .tile').forEach(t => t.classList.remove('selected'));
-    if (tileElm) tileElm.classList.add('selected');
-
-    el('step-template').classList.remove('hidden');
-    renderTemplateTiles();
-
-    // zrušiť prípadne už rozbehnutý formulár, ak používateľ zmenil firmu
-    el('step-form').classList.add('hidden');
-    state.selectedTemplate = null;
-}
-
-// =====================================================================
-// KROK 2: VÝBER ŠABLÓNY
-// =====================================================================
-function renderTemplateTiles() {
-    const wrap = el('template-tiles');
-    wrap.innerHTML = '';
-
-    state.templates.forEach(tpl => {
-        const tile = document.createElement('div');
-        tile.className = 'tile';
-        tile.textContent = tpl.name;
-        tile.addEventListener('click', () => selectTemplate(tpl, tile));
-        wrap.appendChild(tile);
-    });
-}
-
-function selectTemplate(tpl, tileElm) {
-    state.selectedTemplate = tpl;
-
-    document.querySelectorAll('#template-tiles .tile').forEach(t => t.classList.remove('selected'));
-    if (tileElm) tileElm.classList.add('selected');
-
-    el('step-form').classList.remove('hidden');
-    el('step-result').classList.add('hidden');
-    buildOrderForm(tpl);
-    el('step-form').scrollIntoView({ behavior: 'smooth' });
-}
-
-el('back-to-template-button').addEventListener('click', () => {
-    el('step-form').classList.add('hidden');
-    document.querySelectorAll('#template-tiles .tile').forEach(t => t.classList.remove('selected'));
-    state.selectedTemplate = null;
+    return;
+  }
+  await init(data.user);
 });
 
-// =====================================================================
-// KROK 3: FORMULÁR OBJEDNÁVKY
-// =====================================================================
-function buildOrderForm(tpl) {
-    // Reset formulára
-    el('order-form').reset();
-    showError(null);
-    ['err-zakazka', 'err-supplier', 'err-new-supplier', 'err-items', 'err-delivery-date']
-        .forEach(id => setFieldError(id, ''));
+el('logout-btn').addEventListener('click', async () => {
+  await supabaseClient.auth.signOut(); location.reload();
+});
 
-    el('zakazka-input').value = '';
-    el('zakazka-input').classList.remove('invalid');
-    el('supplier-input').value = '';
-    el('supplier-input').classList.remove('invalid');
-    el('new-supplier-toggle').checked = false;
-    el('new-supplier-fields').classList.add('hidden');
-
-    // Predvyplnené texty zo šablóny
-    el('intro-text').value = tpl.default_intro_text || '';
-
-    if (tpl.billing_note) {
-        el('billing-note-wrap').classList.remove('hidden');
-        el('billing-note').value = tpl.billing_note;
-    } else {
-        el('billing-note-wrap').classList.add('hidden');
-        el('billing-note').value = '';
-    }
-
-    if (tpl.default_attachment) {
-        el('attachment-note-wrap').classList.remove('hidden');
-        el('attachment-note').value = tpl.default_attachment;
-    } else {
-        el('attachment-note-wrap').classList.add('hidden');
-        el('attachment-note').value = '';
-    }
-
-    // Minimálny dátum dodania = dnes
-    el('delivery-date').min = todayStr();
-    el('delivery-date').value = '';
-
-    // Tabuľka položiek - hlavička podľa šablóny
-    const head = el('items-head');
-    if (tpl.show_quantity_columns) {
-        head.innerHTML = '<th style="width:90px;">Počet</th><th style="width:90px;">Jedn.</th>' +
-                          '<th>Popis</th><th style="width:120px;">Cena za jedn.</th>' +
-                          '<th style="width:110px;">CELKEM</th><th style="width:30px;"></th>';
-        el('items-total-row').classList.remove('hidden');
-    } else {
-        head.innerHTML = '<th>Popis</th><th style="width:30px;"></th>';
-        el('items-total-row').classList.add('hidden');
-    }
-
-    el('items-body').innerHTML = '';
-    addItemRow(); // jedna prázdna položka na začiatok
+async function checkSession() {
+  const {data} = await supabaseClient.auth.getSession();
+  if (data?.session?.user) await init(data.session.user);
 }
 
-// ---------------------------------------------------------------------
-// Položky objednávky
-// ---------------------------------------------------------------------
-function addItemRow() {
-    const tpl = state.selectedTemplate;
-    const tr = document.createElement('tr');
-
-    if (tpl.show_quantity_columns) {
-        tr.innerHTML = `
-            <td><input type="number" step="0.001" min="0" class="item-qty" /></td>
-            <td><input list="units-list" class="item-unit" /></td>
-            <td><input type="text" class="item-desc" /></td>
-            <td><input type="number" step="0.01" min="0" class="item-price" /></td>
-            <td class="total-cell">0,00 €</td>
-            <td><button type="button" class="danger remove-item">×</button></td>
-        `;
-    } else {
-        tr.innerHTML = `
-            <td><input type="text" class="item-desc" /></td>
-            <td><button type="button" class="danger remove-item">×</button></td>
-        `;
-    }
-
-    el('items-body').appendChild(tr);
-
-    // doplniť spoločný datalist pre jednotky, ak ešte neexistuje
-    if (!el('units-list')) {
-        const dl = document.createElement('datalist');
-        dl.id = 'units-list';
-        dl.innerHTML = UNIT_OPTIONS.map(u => `<option value="${u}"></option>`).join('');
-        document.body.appendChild(dl);
-    }
-
-    tr.querySelectorAll('.item-qty, .item-price').forEach(inp => {
-        inp.addEventListener('input', () => recalcRow(tr));
-    });
-
-    tr.querySelector('.remove-item').addEventListener('click', () => {
-        tr.remove();
-        recalcTotal();
-    });
-
-    recalcRow(tr);
+async function init(user) {
+  S.user = user;
+  const {data:p, error} = await supabaseClient.from('profiles').select('*').eq('id',user.id).single();
+  if (error || !p || !p.is_active) {
+    el('login-error').textContent = !p ? 'Tento účet nemá profil. Kontaktujte administrátora.' : 'Váš účet je deaktivovaný.';
+    el('login-error').classList.remove('hidden');
+    await supabaseClient.auth.signOut(); return;
+  }
+  S.profile = p;
+  el('login-view').classList.add('hidden');
+  el('app-view').classList.remove('hidden');
+  el('app-view').style.display = 'flex';
+  el('user-name').textContent = p.full_name + ' (' + p.initials + ')';
+  await loadAll();
 }
+
+// ── LOAD DATA ──────────────────────────────────────────────────────────
+async function loadAll() {
+  const [cR,tR,sR,zR,oR] = await Promise.all([
+    supabaseClient.from('companies').select('*'),
+    supabaseClient.from('order_templates').select('*').order('sort_order'),
+    supabaseClient.from('suppliers').select('*').eq('is_active',true).order('name'),
+    supabaseClient.from('zakazky').select('*').eq('aktivna',true).order('cislo'),
+    supabaseClient.from('orders').select('*').order('sequence_number',{ascending:false})
+  ]);
+  S.companies = (cR.data||[]).filter(c=>(S.profile.allowed_company_codes||[]).includes(c.code));
+  S.templates = tR.data||[];
+  S.suppliers = sR.data||[];
+  S.zakazky = zR.data||[];
+  S.orders = oR.data||[];
+  buildDatalists();
+  renderCompanyTiles();
+  renderSidebar();
+  showStep('step-company');
+}
+
+// ── SIDEBAR ────────────────────────────────────────────────────────────
+function renderSidebar(q) {
+  q = (q||'').toLowerCase().trim();
+  const list = el('sidebar-list');
+  const filtered = S.orders.filter(o =>
+    !q || o.order_number.toLowerCase().includes(q)
+      || (o.supplier_snapshot?.name||'').toLowerCase().includes(q)
+      || (o.zakazka_cislo||'').toLowerCase().includes(q)
+  );
+  if (!filtered.length) {
+    list.innerHTML = '<div style="padding:16px;text-align:center;color:var(--muted);font-size:13px;">Žiadne výsledky</div>';
+    return;
+  }
+  list.innerHTML = '';
+  filtered.forEach(o => {
+    const d = document.createElement('div');
+    d.className = 'order-item' + (S.viewOrder?.id===o.id ? ' active' : '');
+    d.innerHTML = `<div class="oi-num">${esc(o.order_number)}</div>
+      <div class="oi-sup">${esc(o.supplier_snapshot?.name||'—')}</div>
+      <div class="oi-date">${fmtD(o.order_date)}${o.total_amount?' · '+fmt(o.total_amount):''}</div>`;
+    d.addEventListener('click', () => openOrder(o));
+    list.appendChild(d);
+  });
+}
+
+el('sidebar-search').addEventListener('input', e => renderSidebar(e.target.value));
+el('new-order-btn').addEventListener('click', () => {
+  S.viewOrder = null; S.cloneData = null;
+  showStep('step-company');
+  renderSidebar(el('sidebar-search').value);
+  renderCompanyTiles();
+  S.selCompany = null; S.selTemplate = null;
+  el('step-template').classList.add('hidden');
+  el('step-form').classList.add('hidden');
+  el('step-result').classList.add('hidden');
+});
+
+// ── VIEW ORDER ──────────────────────────────────────────────────────────
+async function openOrder(order) {
+  S.viewOrder = order;
+  renderSidebar(el('sidebar-search').value);
+  ['step-company','step-template','step-form','step-result'].forEach(id=>el(id).classList.add('hidden'));
+  el('view-order').classList.remove('hidden');
+  el('view-title').textContent = 'Objednávka č. ' + order.order_number;
+
+  const {data:items} = await supabaseClient.from('order_items')
+    .select('*').eq('order_id',order.id).order('position');
+  S.viewItems = items||[];
+
+  const tpl = S.templates.find(t=>t.code===order.template_code)||{};
+  const sup = order.supplier_snapshot||{};
+  const comp = S.companies.find(c=>c.code===order.company_code)||{};
+
+  const grid = el('view-grid');
+  grid.innerHTML = '';
+  [
+    ['Firma', comp.name||order.company_code],
+    ['Zákazka', order.zakazka_cislo],
+    ['Typ', tpl.name||order.template_code],
+    ['Dodávateľ', sup.name||''],
+    ['IČO dodávateľa', sup.ico||''],
+    ['Dátum vystavenia', fmtD(order.order_date)],
+    ['Dátum dodania', fmtD(order.delivery_date)||'—'],
+    ['Platba', PM[order.payment_method]||order.payment_method],
+    ['Celkom', order.total_amount ? fmt(order.total_amount) : '—'],
+    ...(order.doprava ? [['Doprava',order.doprava]] : []),
+    ...(order.sprava ? [['Správa',order.sprava]] : []),
+  ].forEach(([l,v]) => {
+    grid.innerHTML += `<div class="lbl">${esc(l)}</div><div class="val">${esc(v)}</div>`;
+  });
+
+  const it = el('view-items');
+  if (tpl.show_quantity_columns) {
+    it.innerHTML = `<thead><tr><th>Počet</th><th>Jedn.</th><th>Popis</th><th>Cena/jedn.</th><th>CELKEM</th></tr></thead><tbody>`
+      + S.viewItems.map(i=>`<tr><td>${i.quantity??''}</td><td>${esc(i.unit||'')}</td><td>${esc(i.description)}</td>
+        <td class="total-cell">${i.unit_price!=null?fmt(i.unit_price):''}</td>
+        <td class="total-cell">${i.line_total!=null?fmt(i.line_total):''}</td></tr>`).join('')
+      + `<tr class="items-total-row"><td colspan="4">CELKEM</td><td class="total-cell">${fmt(order.total_amount)}</td></tr></tbody>`;
+  } else {
+    it.innerHTML = `<thead><tr><th>Popis</th></tr></thead><tbody>`
+      + S.viewItems.map(i=>`<tr><td>${esc(i.description)}</td></tr>`).join('') + '</tbody>';
+  }
+  S.lastOrder = order; S.lastItems = S.viewItems;
+}
+
+el('view-excel-btn').addEventListener('click', () => exportExcel(S.viewOrder, S.viewItems));
+el('view-print-btn').addEventListener('click', () => printOrder(S.viewOrder, S.viewItems));
+el('view-clone-btn').addEventListener('click', () => cloneOrder(S.viewOrder, S.viewItems));
+
+// ── CLONE ───────────────────────────────────────────────────────────────
+function cloneOrder(order, items) {
+  S.cloneData = {order, items};
+  const comp = S.companies.find(c=>c.code===order.company_code);
+  if (comp) { S.selCompany = comp; document.querySelectorAll('#company-tiles .tile').forEach(t=>t.classList.remove('selected')); }
+  const tpl = S.templates.find(t=>t.code===order.template_code);
+  if (tpl) { S.selTemplate = tpl; document.querySelectorAll('#template-tiles .tile').forEach(t=>t.classList.remove('selected')); }
+
+  ['step-company','step-template','view-order','step-result'].forEach(id=>el(id).classList.add('hidden'));
+  el('step-form').classList.remove('hidden');
+  el('form-error').classList.add('hidden');
+
+  buildItemsHead(tpl||{});
+  el('order-date').value = today();
+  el('intro-text').value = order.intro_text||'';
+  el('billing-note').value = order.billing_note||'';
+  el('attachment-note').value = order.attachment_note||'';
+  el('delivery-date').value = '';
+  el('doprava').value = order.doprava||'';
+  el('sprava').value = order.sprava||'';
+  el('note').value = order.note||'';
+  const pm = document.querySelector(`input[name="payment"][value="${order.payment_method}"]`);
+  if (pm) pm.checked = true;
+  if (tpl?.billing_note) el('billing-note-wrap').classList.remove('hidden');
+  if (order.attachment_note) el('attachment-note-wrap').classList.remove('hidden');
+
+  const z = S.zakazky.find(z=>z.cislo===order.zakazka_cislo);
+  if (z) el('zakazka-input').value = z.cislo+' - '+z.nazov;
+
+  const sup = order.supplier_snapshot;
+  if (sup) {
+    for (const [k,v] of S.supplierMap) { if (v.ico===sup.ico) { el('supplier-input').value=k; break; } }
+  }
+
+  el('items-body').innerHTML = '';
+  items.forEach(it => addItemRow(it));
+  recalcTotal();
+  el('step-form').scrollIntoView({behavior:'smooth'});
+}
+
+// ── STEPS ───────────────────────────────────────────────────────────────
+function showStep(id) {
+  ['view-order','step-company','step-template','step-form','step-result'].forEach(s=>el(s).classList.add('hidden'));
+  el(id).classList.remove('hidden');
+}
+
+function renderCompanyTiles() {
+  const wrap = el('company-tiles'); wrap.innerHTML='';
+  S.companies.forEach(c => {
+    const t = document.createElement('div');
+    t.className = 'tile' + (S.selCompany?.code===c.code?' selected':'');
+    t.innerHTML = esc(c.name)+'<small style="display:block;font-weight:400;font-size:11px;color:var(--muted)">'+esc(c.code)+'</small>';
+    t.addEventListener('click', () => {
+      S.selCompany=c; S.selTemplate=null;
+      document.querySelectorAll('#company-tiles .tile').forEach(x=>x.classList.remove('selected')); t.classList.add('selected');
+      el('step-template').classList.remove('hidden');
+      el('step-form').classList.add('hidden'); el('step-result').classList.add('hidden');
+      renderTemplateTiles();
+    });
+    wrap.appendChild(t);
+  });
+  if (S.companies.length===1) wrap.firstChild?.click();
+}
+
+function renderTemplateTiles() {
+  const wrap = el('template-tiles'); wrap.innerHTML='';
+  S.templates.forEach(tpl => {
+    const t = document.createElement('div');
+    t.className = 'tile' + (S.selTemplate?.code===tpl.code?' selected':'');
+    t.textContent = tpl.name;
+    t.addEventListener('click', () => {
+      S.selTemplate=tpl; S.cloneData=null;
+      document.querySelectorAll('#template-tiles .tile').forEach(x=>x.classList.remove('selected')); t.classList.add('selected');
+      el('view-order').classList.add('hidden'); el('step-result').classList.add('hidden');
+      buildForm(tpl);
+      el('step-form').classList.remove('hidden');
+      el('step-form').scrollIntoView({behavior:'smooth'});
+    });
+    wrap.appendChild(t);
+  });
+}
+
+el('back-btn').addEventListener('click', () => {
+  el('step-form').classList.add('hidden');
+  document.querySelectorAll('#template-tiles .tile').forEach(t=>t.classList.remove('selected'));
+  S.selTemplate=null;
+});
+
+// ── FORM ─────────────────────────────────────────────────────────────────
+function buildForm(tpl) {
+  el('order-form').reset();
+  el('form-error').classList.add('hidden');
+  ['err-order-date','err-zakazka','err-supplier','err-new-supplier','err-items','err-delivery-date'].forEach(id=>setErr(id,''));
+  el('zakazka-input').value=''; el('zakazka-input').classList.remove('invalid');
+  el('supplier-input').value=''; el('supplier-input').classList.remove('invalid');
+  el('new-supplier-toggle').checked=false;
+  el('new-supplier-fields').classList.add('hidden');
+  el('supplier-input').disabled=false;
+  el('intro-text').value=tpl.default_intro_text||'';
+  tpl.billing_note ? el('billing-note-wrap').classList.remove('hidden') : el('billing-note-wrap').classList.add('hidden');
+  el('billing-note').value=tpl.billing_note||'';
+  tpl.default_attachment ? el('attachment-note-wrap').classList.remove('hidden') : el('attachment-note-wrap').classList.add('hidden');
+  el('attachment-note').value=tpl.default_attachment||'';
+  el('order-date').value=today();
+  el('delivery-date').value='';
+  buildItemsHead(tpl);
+  el('items-body').innerHTML='';
+  addItemRow();
+}
+
+function buildItemsHead(tpl) {
+  const h=el('items-head');
+  if (tpl.show_quantity_columns) {
+    h.innerHTML='<th style="width:80px">Počet</th><th style="width:70px">Jedn.</th><th>Popis</th><th style="width:110px">Cena/jedn.</th><th style="width:100px">CELKEM</th><th style="width:28px"></th>';
+    el('items-total-row').classList.remove('hidden');
+  } else {
+    h.innerHTML='<th>Popis</th><th style="width:28px"></th>';
+    el('items-total-row').classList.add('hidden');
+  }
+}
+
+function addItemRow(pf) {
+  const tpl=S.selTemplate;
+  const tr=document.createElement('tr');
+  if (tpl?.show_quantity_columns) {
+    tr.innerHTML=`<td><input type="number" step="0.001" min="0" class="iq" value="${pf?.quantity??''}"/></td>
+      <td><input list="units-dl" class="iu" value="${esc(pf?.unit||'')}"/></td>
+      <td><input type="text" class="id" value="${esc(pf?.description||'')}"/></td>
+      <td><input type="number" step="0.0001" min="0" class="ip" value="${pf?.unit_price??''}"/></td>
+      <td class="total-cell">${pf?.line_total!=null?fmt(pf.line_total):'0,00 €'}</td>
+      <td><button type="button" class="danger">×</button></td>`;
+    tr.querySelectorAll('.iq,.ip').forEach(i=>i.addEventListener('input',()=>recalcRow(tr)));
+  } else {
+    tr.innerHTML=`<td><input type="text" class="id" value="${esc(pf?.description||'')}"/></td>
+      <td><button type="button" class="danger">×</button></td>`;
+  }
+  if (!el('units-dl')) {
+    const dl=document.createElement('datalist'); dl.id='units-dl';
+    dl.innerHTML=UNITS.map(u=>`<option value="${u}"></option>`).join('');
+    document.body.appendChild(dl);
+  }
+  tr.querySelector('.danger').addEventListener('click',()=>{tr.remove();recalcTotal();});
+  el('items-body').appendChild(tr);
+}
+
+el('add-item-btn').addEventListener('click', ()=>addItemRow());
 
 function recalcRow(tr) {
-    const qtyInp = tr.querySelector('.item-qty');
-    const priceInp = tr.querySelector('.item-price');
-    const totalCell = tr.querySelector('.total-cell');
-
-    if (qtyInp && priceInp && totalCell) {
-        const qty = parseFloat(qtyInp.value) || 0;
-        const price = parseFloat(priceInp.value) || 0;
-        totalCell.textContent = formatMoney(qty * price);
-    }
-    recalcTotal();
+  const q=parseFloat(tr.querySelector('.iq')?.value)||0;
+  const p=parseFloat(tr.querySelector('.ip')?.value)||0;
+  const tc=tr.querySelector('.total-cell'); if(tc) tc.textContent=fmt(q*p);
+  recalcTotal();
 }
-
 function recalcTotal() {
-    if (!state.selectedTemplate || !state.selectedTemplate.show_quantity_columns) {
-        el('items-total-value').textContent = formatMoney(0);
-        return;
+  if (!S.selTemplate?.show_quantity_columns) { el('items-total-val').textContent=fmt(0); return; }
+  let t=0;
+  document.querySelectorAll('#items-body tr').forEach(tr=>{
+    t+=(parseFloat(tr.querySelector('.iq')?.value)||0)*(parseFloat(tr.querySelector('.ip')?.value)||0);
+  });
+  el('items-total-val').textContent=fmt(t);
+}
+
+// Datalists
+function buildDatalists() {
+  const zdl=el('zakazky-list'); zdl.innerHTML=''; S.zakazkyMap.clear();
+  S.zakazky.forEach(z=>{
+    const lbl=z.cislo+' - '+z.nazov; S.zakazkyMap.set(lbl,z);
+    const o=document.createElement('option'); o.value=lbl; zdl.appendChild(o);
+  });
+  const sdl=el('suppliers-list'); sdl.innerHTML=''; S.supplierMap.clear();
+  S.suppliers.forEach(s=>{
+    const lbl=s.name+' (IČO '+(s.ico||'—')+')'; S.supplierMap.set(lbl,s);
+    const o=document.createElement('option'); o.value=lbl; sdl.appendChild(o);
+  });
+}
+
+el('zakazka-input').addEventListener('input',()=>{el('zakazka-input').classList.remove('invalid');setErr('err-zakazka','');});
+el('supplier-input').addEventListener('input',()=>{el('supplier-input').classList.remove('invalid');setErr('err-supplier','');});
+el('new-supplier-toggle').addEventListener('change',e=>{
+  if(e.target.checked){el('new-supplier-fields').classList.remove('hidden');el('supplier-input').disabled=true;el('supplier-input').value='';}
+  else{el('new-supplier-fields').classList.add('hidden');el('supplier-input').disabled=false;}
+});
+
+// ── SUBMIT ───────────────────────────────────────────────────────────────
+el('order-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  el('form-error').classList.add('hidden');
+  const tpl=S.selTemplate; let ok=true;
+
+  const orderDate=el('order-date').value;
+  if(!orderDate){setErr('err-order-date','Vyplňte dátum vystavenia.');ok=false;}
+  else setErr('err-order-date','');
+
+  const zakazka=S.zakazkyMap.get(el('zakazka-input').value.trim());
+  if(!zakazka){el('zakazka-input').classList.add('invalid');setErr('err-zakazka','Vyberte zákazku zo zoznamu.');ok=false;}
+
+  const isNew=el('new-supplier-toggle').checked;
+  let supplier=null, newSupData=null;
+  if(isNew){
+    const name=el('ns-name').value.trim(),ico=el('ns-ico').value.trim(),
+          address=el('ns-address').value.trim(),city=el('ns-city').value.trim();
+    if(!name||!ico||!address||!city){setErr('err-new-supplier','Vyplňte Názov, IČO, Adresu a Mesto.');ok=false;}
+    else if(!/^\d{6,12}$/.test(ico)){setErr('err-new-supplier','IČO musí obsahovať 6–12 číslic.');ok=false;}
+    else{setErr('err-new-supplier','');
+      newSupData={name,ico,address,city,zip:el('ns-zip').value.trim()||null,
+        dic:el('ns-dic').value.trim()||null,contact_person:el('ns-contact').value.trim()||null,
+        phone:el('ns-phone').value.trim()||null,created_by:S.profile.id};}
+  } else {
+    supplier=S.supplierMap.get(el('supplier-input').value.trim());
+    if(!supplier){el('supplier-input').classList.add('invalid');setErr('err-supplier','Vyberte dodávateľa zo zoznamu.');ok=false;}
+  }
+
+  const items=[]; let hasDesc=false;
+  document.querySelectorAll('#items-body tr').forEach(tr=>{
+    const desc=tr.querySelector('.id')?.value.trim(); if(!desc) return; hasDesc=true;
+    const it={description:desc,quantity:null,unit_price:null,unit:null};
+    if(tpl.show_quantity_columns){
+      const q=tr.querySelector('.iq')?.value, p=tr.querySelector('.ip')?.value;
+      it.quantity=q===''?null:parseFloat(q);
+      it.unit_price=p===''?null:parseFloat(p);
+      it.unit=tr.querySelector('.iu')?.value.trim()||null;
     }
-    let total = 0;
-    document.querySelectorAll('#items-body tr').forEach(tr => {
-        const qty = parseFloat(tr.querySelector('.item-qty')?.value) || 0;
-        const price = parseFloat(tr.querySelector('.item-price')?.value) || 0;
-        total += qty * price;
+    items.push(it);
+  });
+  if(!hasDesc){setErr('err-items','Pridajte aspoň jednu položku.');ok=false;}
+  else setErr('err-items','');
+
+  const ddVal=el('delivery-date').value;
+  if(ddVal&&ddVal<orderDate){setErr('err-delivery-date','Dátum dodania nesmie byť pred dátumom vystavenia.');ok=false;}
+  else setErr('err-delivery-date','');
+
+  if(!ok) return;
+  el('submit-btn').disabled=true;
+  try{
+    if(isNew){
+      const {data:ins,error:ie}=await supabaseClient.from('suppliers').insert(newSupData).select().single();
+      if(ie){
+        el('form-error').textContent=ie.message?.includes('suppliers_ico_unique_idx')
+          ?'Dodávateľ s týmto IČO už existuje – vyhľadajte ho v zozname.'
+          :'Chyba: '+ie.message;
+        el('form-error').classList.remove('hidden'); el('submit-btn').disabled=false; return;
+      }
+      supplier=ins; S.suppliers.push(ins); buildDatalists();
+    }
+    const snap={name:supplier.name,address:supplier.address,zip:supplier.zip,city:supplier.city,
+      ico:supplier.ico,dic:supplier.dic,contact_person:supplier.contact_person,
+      phone:supplier.phone,email:supplier.email};
+
+    const {data:order,error:oe}=await supabaseClient.rpc('create_order',{
+      p_company_code:S.selCompany.code,
+      p_template_code:tpl.code,
+      p_zakazka_cislo:zakazka.cislo,
+      p_supplier_id:supplier.id,
+      p_supplier_snapshot:snap,
+      p_intro_text:el('intro-text').value.trim()||null,
+      p_billing_note:el('billing-note').value.trim()||null,
+      p_attachment_note:el('attachment-note').value.trim()||null,
+      p_delivery_date:ddVal||null,
+      p_payment_method:document.querySelector('input[name="payment"]:checked').value,
+      p_doprava:el('doprava').value.trim()||null,
+      p_sprava:el('sprava').value.trim()||null,
+      p_note:el('note').value.trim()||null,
+      p_items:items,
+      p_order_date:orderDate
     });
-    el('items-total-value').textContent = formatMoney(total);
-}
+    if(oe){
+      el('form-error').textContent='Chyba: '+oe.message;
+      el('form-error').classList.remove('hidden'); el('submit-btn').disabled=false; return;
+    }
+    const {data:oItems}=await supabaseClient.from('order_items').select('*').eq('order_id',order.id).order('position');
+    order.order_date=orderDate;
+    S.lastOrder=order; S.lastItems=oItems||[];
+    S.orders.unshift(order); S.cloneData=null;
+    renderSidebar(el('sidebar-search').value);
+    showStep('step-result');
+    el('result-banner').textContent='Objednávka č. '+order.order_number+' bola úspešne vystavená.';
+  } finally { el('submit-btn').disabled=false; }
+});
 
-el('add-item-button').addEventListener('click', addItemRow);
+el('result-excel-btn').addEventListener('click',()=>exportExcel(S.lastOrder,S.lastItems));
+el('result-print-btn').addEventListener('click',()=>printOrder(S.lastOrder,S.lastItems));
+el('result-new-btn').addEventListener('click',()=>{
+  S.viewOrder=null; S.cloneData=null; S.selCompany=null; S.selTemplate=null;
+  showStep('step-company'); renderCompanyTiles();
+  el('step-template').classList.add('hidden');
+  renderSidebar(el('sidebar-search').value);
+});
 
-// =====================================================================
-// ZÁKAZKY a DODÁVATELIA - datalisty + validácia výberu
-// =====================================================================
-function renderZakazkyDatalist() {
-    const dl = el('zakazky-list');
-    dl.innerHTML = '';
-    state.zakazkyByLabel.clear();
+// ── EXCEL EXPORT ─────────────────────────────────────────────────────────
+async function exportExcel(order, items) {
+  const comp=S.companies.find(c=>c.code===order.company_code)||{};
+  const sup=order.supplier_snapshot||{};
+  const tpl=S.templates.find(t=>t.code===order.template_code)||{};
+  const wb=new ExcelJS.Workbook();
+  const ws=wb.addWorksheet('Objednávka');
+  ws.pageSetup.paperSize=9; ws.pageSetup.orientation='portrait'; ws.pageSetup.fitToPage=true;
+  ws.pageSetup.margins={left:0.4,right:0.4,top:0.6,bottom:0.6,header:0,footer:0};
 
-    state.zakazky.forEach(z => {
-        const label = `${z.cislo} - ${z.nazov}`;
-        state.zakazkyByLabel.set(label, z);
-        const opt = document.createElement('option');
-        opt.value = label;
-        dl.appendChild(opt);
+  [1.3,0.4,3.7,8.7,7.7,3.7,3.0,3.0,4.7,9.7,2.7,8.7,7.7,4.7,5.7,5.7,12.7,3.7,0.4]
+    .forEach((w,i)=>ws.getColumn(i+1).width=w);
+
+  const TH={style:'thin'}, ME={style:'medium'};
+  const B=()=>({left:TH,right:TH,top:TH,bottom:TH});
+  const SB=(t,b)=>({left:TH,right:TH,top:t?TH:{style:'none'},bottom:b?TH:{style:'none'}});
+
+  function SC(r,c,val,o={}) {
+    const cell=ws.getCell(r,c);
+    if(val!==undefined) cell.value=val;
+    cell.font={name:'Calibri',size:o.sz||10,bold:!!o.bold,...(o.italic?{italic:true}:{})};
+    cell.alignment={horizontal:o.h||'left',vertical:'center',wrapText:!!o.wrap};
+    if(o.b) cell.border=B();
+    if(o.f) cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:o.f}};
+    if(o.n) cell.numFmt=o.n;
+    return cell;
+  }
+  function M(r1,c1,r2,c2){ws.mergeCells(r1,c1,r2,c2);}
+
+  [1,2,3,4,5,6,7,8,9,10].forEach((r,i)=>ws.getRow(r).height=[6,18,12,12,12,12,6,28,6,16][i]);
+
+  // Logo
+  const lid=wb.addImage({base64:LOGO_B64,extension:'png'});
+  ws.addImage(lid,{tl:{col:1,row:1},ext:{width:80,height:55}});
+
+  // Header
+  M(2,5,2,12); SC(2,5,comp.name,{bold:true,sz:14});
+  M(3,5,3,12); SC(3,5,comp.address+', '+comp.zip+' '+comp.city,{sz:9});
+  M(4,5,4,12); SC(4,5,'tel. +421 244 451 339   mail: '+comp.email,{sz:9});
+  M(5,5,5,12); SC(5,5,'IČO: '+comp.ico,{sz:9});
+  M(2,14,2,17); SC(2,14,'Objednávka č. '+order.order_number,{bold:true,h:'right'});
+
+  M(8,2,8,17);
+  const tc=ws.getCell(8,2); tc.value='OBJEDNÁVKA';
+  tc.font={name:'Calibri',size:20,bold:true,italic:true};
+  tc.alignment={horizontal:'center',vertical:'center'};
+
+  M(10,4,10,11); SC(10,4,'Dodávateľ',{bold:true,f:'FFD9D9D9'});
+  M(10,12,10,17); SC(10,12,'Odberateľ',{bold:true,f:'FFD9D9D9'});
+
+  const ALBL=['Meno','Adresa','PSČ','Vybavuje','Telefón','IČO','DIČ'];
+  const SV=[sup.name,sup.address,(sup.zip||'')+' '+(sup.city||''),sup.contact_person||'',sup.phone||'',sup.ico||'',sup.dic||''];
+  const CV=[comp.name,comp.address,comp.zip+' '+comp.city,S.profile.full_name,S.profile.phone||'',comp.ico,comp.dic];
+  for(let i=0;i<7;i++){
+    const r=11+i; ws.getRow(r).height=14;
+    SC(r,4,ALBL[i]); M(r,5,r,11); SC(r,5,SV[i],{b:true});
+    SC(r,12,ALBL[i]); M(r,13,r,17); SC(r,13,CV[i],{b:true});
+  }
+
+  let r=19; ws.getRow(r).height=14;
+  M(r,4,r,6); SC(r,4,'Zákazka č.:',{bold:true});
+  M(r,7,r,11); SC(r,7,order.zakazka_cislo,{b:true});
+
+  r=20; ws.getRow(r).height=16;
+  if(tpl.show_quantity_columns){
+    SC(r,4,'Počet',{bold:true,b:true,h:'center'}); SC(r,5,'Jedn.',{bold:true,b:true,h:'center'});
+    M(r,6,r,13); SC(r,6,'Popis',{bold:true,b:true,h:'center'});
+    M(r,14,r,16); SC(r,14,'Cena za jedn.',{bold:true,b:true,h:'center'});
+    SC(r,17,'CELKEM',{bold:true,b:true,h:'center'});
+  } else {
+    M(r,4,r,17); SC(r,4,'Popis',{bold:true,b:true,h:'center'});
+  }
+
+  r=21; ws.getRow(r).height=14;
+  const ilines=(order.intro_text||'').split('\n');
+  ilines.forEach((line,li)=>{
+    if(li>0){r++;ws.getRow(r).height=14;}
+    if(tpl.show_quantity_columns){
+      SC(r,4,null,{b:true}); SC(r,5,null,{b:true});
+      M(r,6,r,13); SC(r,6,line,{bold:li===0,b:true});
+      M(r,14,r,16); SC(r,14,null,{b:true}); SC(r,17,null,{b:true});
+    } else {
+      M(r,4,r,17); SC(r,4,line,{bold:li===0,b:true});
+    }
+  });
+
+  items.forEach(it=>{
+    r++; ws.getRow(r).height=14;
+    if(tpl.show_quantity_columns){
+      SC(r,4,it.quantity!=null?Number(it.quantity):null,{b:true,h:'right',n:'#,##0.###'});
+      SC(r,5,it.unit||'',{b:true,h:'center'});
+      M(r,6,r,13); SC(r,6,it.description,{b:true});
+      M(r,14,r,16); SC(r,14,it.unit_price!=null?Number(it.unit_price):null,{b:true,h:'right',n:'#,##0.0000 €'});
+      SC(r,17,it.line_total!=null?Number(it.line_total):null,{b:true,h:'right',n:'#,##0.00 €'});
+    } else {
+      M(r,4,r,17); SC(r,4,it.description,{b:true});
+    }
+  });
+
+  while(r<38){
+    r++; ws.getRow(r).height=14;
+    if(tpl.show_quantity_columns){
+      SC(r,4,null,{b:true}); SC(r,5,null,{b:true});
+      M(r,6,r,13); SC(r,6,null,{b:true});
+      M(r,14,r,16); SC(r,14,null,{b:true}); SC(r,17,null,{b:true});
+    } else { M(r,4,r,17); SC(r,4,null,{b:true}); }
+  }
+
+  if(order.billing_note){
+    order.billing_note.split('\n').forEach(line=>{
+      r++; ws.getRow(r).height=14;
+      if(tpl.show_quantity_columns){
+        SC(r,4,null,{b:true}); SC(r,5,null,{b:true});
+        M(r,6,r,13); SC(r,6,line,{b:true});
+        M(r,14,r,16); SC(r,14,null,{b:true}); SC(r,17,null,{b:true});
+      } else { M(r,4,r,17); SC(r,4,line,{b:true}); }
     });
+  }
+
+  [
+    [true,'Faktúru pošlite na adresu:'],
+    [true,comp.name+', '+comp.address+', '+comp.zip+' '+comp.city],
+    [false,comp.email],
+    [false,'Splatnosť faktúry: '+(comp.invoice_due_days||45)+' dní od dodania']
+  ].forEach(([bold,txt])=>{
+    r++; ws.getRow(r).height=14;
+    if(tpl.show_quantity_columns){
+      SC(r,4,null,{b:true}); SC(r,5,null,{b:true});
+      M(r,6,r,13); SC(r,6,txt,{bold,b:true});
+      M(r,14,r,16); SC(r,14,null,{b:true}); SC(r,17,null,{b:true});
+    } else { M(r,4,r,17); SC(r,4,txt,{bold,b:true}); }
+  });
+
+  if(order.attachment_note){
+    r++; ws.getRow(r).height=14;
+    if(tpl.show_quantity_columns){
+      SC(r,4,null,{b:true}); SC(r,5,null,{b:true});
+      M(r,6,r,13); SC(r,6,'Prílohy: '+order.attachment_note,{b:true});
+      M(r,14,r,16); SC(r,14,null,{b:true}); SC(r,17,null,{b:true});
+    } else { M(r,4,r,17); SC(r,4,'Prílohy: '+order.attachment_note,{b:true}); }
+  }
+
+  if(tpl.show_quantity_columns){
+    r++; ws.getRow(r).height=16;
+    M(r,14,r,16); SC(r,14,'CELKEM',{bold:true,h:'right',f:'FFD9D9D9'});
+    SC(r,17,Number(order.total_amount),{bold:true,h:'right',b:true,f:'FFD9D9D9',n:'#,##0.00 €'});
+  }
+
+  r+=2; ws.getRow(r).height=14;
+  M(r,4,r,8); SC(r,4,'Podrobnosti platby',{bold:true});
+  const ppm=order.payment_method;
+  [['sekom','Šekom'],['hotovost','Hotovosť'],['kreditka','Kreditnou kartou'],['ucet','Na účet']].forEach(([code,lbl])=>{
+    r++; ws.getRow(r).height=13;
+    SC(r,5,code===ppm?'●':'○'); SC(r,6,lbl);
+  });
+
+  const dr=r-3;
+  M(dr,14,dr,17); SC(dr,14,'Dátum dodania',{bold:true,h:'center',f:'FFD9D9D9'});
+  M(dr+1,14,dr+3,17);
+  const dc=ws.getCell(dr+1,14); dc.value=order.delivery_date||'';
+  dc.font={name:'Calibri',size:12,bold:true};
+  dc.alignment={horizontal:'center',vertical:'center'}; dc.border=B();
+
+  r++; ws.getRow(r).height=20;
+  M(r,5,r,8); SC(r,5,'Číslo účtu / kreditnej karty');
+  M(r,10,r,12); SC(r,10,comp.bank_account||'',{b:true});
+  r++; ws.getRow(r).height=14;
+  M(r,5,r,8); SC(r,5,'Kód banky / Platí do');
+  M(r,10,r,12); SC(r,10,comp.bank_name||'',{b:true});
+
+  r+=2; ws.getRow(r).height=6;
+  M(r,2,r,17); ws.getCell(r,2).border={top:ME};
+
+  r++; ws.getRow(r).height=14;
+  M(r,2,r,11); SC(r,2,'Schválenie',{bold:true});
+  const ar=r;
+  for(let i=1;i<=4;i++){
+    r++; ws.getRow(r).height=14; M(r,2,r,11);
+    ws.getCell(r,2).border=SB(i===1,i===4);
+  }
+  const ir=ar+1;
+  [['Dátum',order.order_date||''],['Objedn. č.',order.order_number],
+   ['Správa',order.sprava||''],['Doprava',order.doprava||'']].forEach(([l,v],i)=>{
+    M(ir+i,13,ir+i,14); SC(ir+i,13,l);
+    M(ir+i,15,ir+i,17); SC(ir+i,15,v,{b:true});
+  });
+
+  r++; ws.getRow(r).height=14;
+  M(r,2,r,17); SC(r,2,'Poznámky / pripomienky',{bold:true});
+  for(let i=0;i<3;i++){
+    r++; ws.getRow(r).height=16; M(r,2,r,17);
+    const nc=ws.getCell(r,2);
+    if(i===0) nc.value=order.note||'';
+    nc.font={name:'Calibri',size:10};
+    nc.border=SB(i===0,i===2);
+  }
+
+  const buf=await wb.xlsx.writeBuffer();
+  const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob); a.download='Objednavka_'+order.order_number.replace(/\//g,'-')+'.xlsx'; a.click();
 }
 
-function renderSuppliersDatalist() {
-    const dl = el('suppliers-list');
-    dl.innerHTML = '';
-    state.suppliersByLabel.clear();
-
-    state.suppliers.forEach(s => {
-        const label = `${s.name} (IČO ${s.ico || '—'})`;
-        state.suppliersByLabel.set(label, s);
-        const opt = document.createElement('option');
-        opt.value = label;
-        dl.appendChild(opt);
-    });
+// ── PRINT ─────────────────────────────────────────────────────────────────
+function printOrder(order, items) {
+  const comp=S.companies.find(c=>c.code===order.company_code)||{};
+  const sup=order.supplier_snapshot||{};
+  const tpl=S.templates.find(t=>t.code===order.template_code)||{};
+  let iHtml='';
+  if(tpl.show_quantity_columns){
+    iHtml=`<table class="pi"><thead><tr><th>Počet</th><th>Jedn.</th><th>Popis</th><th class="pr">Cena za jedn.</th><th class="pr">CELKEM</th></tr></thead><tbody>`
+      +items.map(i=>`<tr><td>${i.quantity??''}</td><td>${esc(i.unit||'')}</td><td>${esc(i.description)}</td>
+        <td class="pr">${i.unit_price!=null?fmt(i.unit_price):''}</td><td class="pr">${i.line_total!=null?fmt(i.line_total):''}</td></tr>`).join('')
+      +`<tr><td colspan="4" class="ptot pr">CELKEM</td><td class="ptot pr">${fmt(order.total_amount)}</td></tr></tbody></table>`;
+  } else {
+    iHtml=`<table class="pi"><thead><tr><th>Popis</th></tr></thead><tbody>`
+      +items.map(i=>`<tr><td>${esc(i.description)}</td></tr>`).join('')+'</tbody></table>';
+  }
+  el('print-area').innerHTML=`
+    <div class="ph">
+      <div style="display:flex;gap:10px;align-items:flex-start;">
+        <img src="data:image/png;base64,${LOGO_B64}" style="height:50px;"/>
+        <div class="pc"><strong style="font-size:14px;">${esc(comp.name)}</strong><br/>
+        ${esc(comp.address)}, ${esc(comp.zip)} ${esc(comp.city)}<br/>
+        IČO: ${esc(comp.ico)} &nbsp; DIČ: ${esc(comp.dic)}<br/>${esc(comp.email)}</div>
+      </div>
+      <div class="pon">Objednávka č. ${esc(order.order_number)}</div>
+    </div>
+    <div class="pt">OBJEDNÁVKA</div>
+    <div class="pp">
+      <div class="pp-side"><h4>Dodávateľ</h4><p>
+        ${esc(sup.name)}<br/>${esc(sup.address)}<br/>${esc(sup.zip||'')} ${esc(sup.city||'')}<br/>
+        Vybavuje: ${esc(sup.contact_person||'')}<br/>Tel.: ${esc(sup.phone||'')}<br/>
+        IČO: ${esc(sup.ico||'')} &nbsp; DIČ: ${esc(sup.dic||'')}</p></div>
+      <div class="pp-side"><h4>Odberateľ</h4><p>
+        ${esc(comp.name)}<br/>${esc(comp.address)}<br/>${esc(comp.zip)} ${esc(comp.city)}<br/>
+        Vybavuje: ${esc(S.profile.full_name)}<br/>Tel.: ${esc(S.profile.phone||'')}<br/>
+        IČO: ${esc(comp.ico)} &nbsp; DIČ: ${esc(comp.dic)}</p></div>
+    </div>
+    <div class="pz">Zákazka č.: ${esc(order.zakazka_cislo)}</div>
+    <p style="font-size:11px;font-weight:bold;margin:3px 0;">${esc(order.intro_text||'').replace(/\n/g,'<br/>')}</p>
+    ${iHtml}
+    ${order.billing_note?`<p style="font-size:10px;margin:3px 0;">${esc(order.billing_note).replace(/\n/g,'<br/>')}</p>`:''}
+    <p style="font-size:10px;margin:3px 0;"><strong>Faktúru pošlite na adresu:</strong><br/>
+    ${esc(comp.name)}, ${esc(comp.address)}, ${esc(comp.zip)} ${esc(comp.city)}<br/>
+    ${esc(comp.email)}<br/>Splatnosť faktúry: ${comp.invoice_due_days||45} dní od dodania</p>
+    ${order.attachment_note?`<p style="font-size:10px;"><strong>Prílohy:</strong> ${esc(order.attachment_note)}</p>`:''}
+    <div class="pbot">
+      <div class="pib"><strong>Podrobnosti platby:</strong><br/>
+        ${['sekom','hotovost','kreditka','ucet'].map(c=>(c===order.payment_method?'● ':'○ ')+(PM[c]||c)).join('<br/>')}<br/>
+        Číslo účtu: ${esc(comp.bank_account||'')}<br/>Kód banky: ${esc(comp.bank_name||'')}</div>
+      <div class="pib">
+        <strong>Dátum dodania:</strong> ${esc(order.delivery_date||'—')}<br/>
+        <strong>Dátum vystavenia:</strong> ${esc(order.order_date||'')}<br/>
+        <strong>Objedn. č.:</strong> ${esc(order.order_number)}<br/>
+        <strong>Správa:</strong> ${esc(order.sprava||'')}<br/>
+        <strong>Doprava:</strong> ${esc(order.doprava||'')}
+      </div>
+    </div>
+    <div class="papr">
+      <div class="papr-box"><h4>Schválenie</h4></div>
+      <div></div>
+    </div>
+    ${order.note?`<div class="pnotes"><strong>Poznámky:</strong> ${esc(order.note)}</div>`:''}`;
+  window.print();
 }
 
-function getSelectedZakazka() {
-    const value = el('zakazka-input').value.trim();
-    return state.zakazkyByLabel.get(value) || null;
-}
-
-function getSelectedSupplier() {
-    const value = el('supplier-input').value.trim();
-    return state.suppliersByLabel.get(value) || null;
-}
-
-el('zakazka-input').addEventListener('input', () => {
-    el('zakazka-input').classList.remove('invalid');
-    setFieldError('err-zakazka', '');
-});
-
-el('supplier-input').addEventListener('input', () => {
-    el('supplier-input').classList.remove('invalid');
-    setFieldError('err-supplier', '');
-});
-
-el('new-supplier-toggle').addEventListener('change', (e) => {
-    if (e.target.checked) {
-        el('new-supplier-fields').classList.remove('hidden');
-        el('supplier-input').value = '';
-        el('supplier-input').disabled = true;
-        el('supplier-input').classList.remove('invalid');
-        setFieldError('err-supplier', '');
-    } else {
-        el('new-supplier-fields').classList.add('hidden');
-        el('supplier-input').disabled = false;
-    }
-});
-
-// =====================================================================
-// VALIDÁCIA A ODOSLANIE FORMULÁRA
-// =====================================================================
-el('order-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    showError(null);
-
-    const tpl = state.selectedTemplate;
-    let ok = true;
-
-    // --- Zákazka ---
-    const zakazka = getSelectedZakazka();
-    if (!zakazka) {
-        el('zakazka-input').classList.add('invalid');
-        setFieldError('err-zakazka', 'Vyberte zákazku zo zoznamu (nedá sa zapísať voľný text).');
-        ok = false;
-    }
-
-    // --- Dodávateľ ---
-    const isNewSupplier = el('new-supplier-toggle').checked;
-    let supplier = null;
-    let newSupplierData = null;
-
-    if (isNewSupplier) {
-        const name = el('ns-name').value.trim();
-        const ico = el('ns-ico').value.trim();
-        const address = el('ns-address').value.trim();
-        const city = el('ns-city').value.trim();
-
-        if (!name || !ico || !address || !city) {
-            setFieldError('err-new-supplier', 'Vyplňte aspoň Názov, IČO, Adresu a Mesto nového dodávateľa.');
-            ok = false;
-        } else if (!/^\d{6,12}$/.test(ico)) {
-            setFieldError('err-new-supplier', 'IČO musí obsahovať len číslice (6-12 znakov).');
-            ok = false;
-        } else {
-            setFieldError('err-new-supplier', '');
-            newSupplierData = {
-                name, ico, address, city,
-                zip: el('ns-zip').value.trim() || null,
-                dic: el('ns-dic').value.trim() || null,
-                contact_person: el('ns-contact').value.trim() || null,
-                phone: el('ns-phone').value.trim() || null,
-                created_by: state.profile.id
-            };
-        }
-    } else {
-        supplier = getSelectedSupplier();
-        if (!supplier) {
-            el('supplier-input').classList.add('invalid');
-            setFieldError('err-supplier', 'Vyberte dodávateľa zo zoznamu, alebo zaškrtnite "Nový dodávateľ".');
-            ok = false;
-        }
-    }
-
-    // --- Položky ---
-    const items = [];
-    document.querySelectorAll('#items-body tr').forEach(tr => {
-        const desc = tr.querySelector('.item-desc').value.trim();
-        if (!desc) return; // prázdne riadky ignorujeme
-        const item = { description: desc };
-
-        if (tpl.show_quantity_columns) {
-            const qtyVal = tr.querySelector('.item-qty').value;
-            const priceVal = tr.querySelector('.item-price').value;
-            const unitVal = tr.querySelector('.item-unit').value.trim();
-
-            item.quantity = qtyVal === '' ? null : parseFloat(qtyVal);
-            item.unit_price = priceVal === '' ? null : parseFloat(priceVal);
-            item.unit = unitVal || null;
-
-            if (item.quantity !== null && item.quantity < 0) ok = false;
-            if (item.unit_price !== null && item.unit_price < 0) ok = false;
-        } else {
-            item.quantity = null;
-            item.unit_price = null;
-            item.unit = null;
-        }
-        items.push(item);
-    });
-
-    if (items.length === 0) {
-        setFieldError('err-items', 'Objednávka musí obsahovať aspoň jednu položku s popisom.');
-        ok = false;
-    } else {
-        setFieldError('err-items', '');
-    }
-
-    // --- Dátum dodania ---
-    const deliveryDateVal = el('delivery-date').value;
-    if (deliveryDateVal && deliveryDateVal < todayStr()) {
-        setFieldError('err-delivery-date', 'Dátum dodania nesmie byť v minulosti.');
-        ok = false;
-    } else {
-        setFieldError('err-delivery-date', '');
-    }
-
-    if (!ok) return;
-
-    // --- Odoslanie ---
-    el('submit-order-button').disabled = true;
-    try {
-        let supplierId = null;
-        let supplierSnapshot = null;
-
-        if (isNewSupplier) {
-            const { data: inserted, error: insertError } = await supabaseClient
-                .from('suppliers')
-                .insert(newSupplierData)
-                .select()
-                .single();
-
-            if (insertError) {
-                if (insertError.message && insertError.message.includes('suppliers_ico_unique_idx')) {
-                    showError('Dodávateľ s týmto IČO už v databáze existuje - vyhľadajte ho v poli "Dodávateľ" namiesto vytvárania nového.');
-                } else {
-                    showError('Nepodarilo sa uložiť nového dodávateľa: ' + insertError.message);
-                }
-                el('submit-order-button').disabled = false;
-                return;
-            }
-            supplier = inserted;
-            supplierId = inserted.id;
-            state.suppliers.push(inserted);
-            renderSuppliersDatalist();
-        } else {
-            supplierId = supplier.id;
-        }
-
-        supplierSnapshot = {
-            name: supplier.name,
-            address: supplier.address,
-            zip: supplier.zip,
-            city: supplier.city,
-            ico: supplier.ico,
-            dic: supplier.dic,
-            contact_person: supplier.contact_person,
-            phone: supplier.phone,
-            email: supplier.email
-        };
-
-        const payload = {
-            p_company_code: state.selectedCompany.code,
-            p_template_code: tpl.code,
-            p_zakazka_cislo: zakazka.cislo,
-            p_supplier_id: supplierId,
-            p_supplier_snapshot: supplierSnapshot,
-            p_intro_text: el('intro-text').value.trim() || null,
-            p_billing_note: el('billing-note').value.trim() || null,
-            p_attachment_note: el('attachment-note').value.trim() || null,
-            p_delivery_date: deliveryDateVal || null,
-            p_payment_method: document.querySelector('input[name="payment"]:checked').value,
-            p_doprava: el('doprava').value.trim() || null,
-            p_sprava: el('sprava').value.trim() || null,
-            p_note: el('note').value.trim() || null,
-            p_items: items
-        };
-
-        const { data: order, error: orderError } = await supabaseClient.rpc('create_order', payload);
-
-        if (orderError) {
-            showError('Objednávku sa nepodarilo uložiť: ' + orderError.message);
-            el('submit-order-button').disabled = false;
-            return;
-        }
-
-        const { data: orderItems } = await supabaseClient
-            .from('order_items')
-            .select('*')
-            .eq('order_id', order.id)
-            .order('position');
-
-        state.lastOrder = order;
-        state.lastItems = orderItems || [];
-
-        showResult(order);
-    } finally {
-        el('submit-order-button').disabled = false;
-    }
-});
-
-// =====================================================================
-// KROK 4: VÝSLEDOK
-// =====================================================================
-function showResult(order) {
-    el('step-form').classList.add('hidden');
-    el('step-result').classList.remove('hidden');
-    el('result-banner').textContent = `Objednávka č. ${order.order_number} bola vystavená.`;
-    el('step-result').scrollIntoView({ behavior: 'smooth' });
-}
-
-el('new-order-button').addEventListener('click', () => {
-    location.reload();
-});
-
-// =====================================================================
-// EXPORT DO EXCELU
-// =====================================================================
-el('export-excel-button').addEventListener('click', () => {
-    const order = state.lastOrder;
-    const items = state.lastItems;
-    const company = state.selectedCompany;
-    const supplier = order.supplier_snapshot;
-    const profile = state.profile;
-
-    const ws = XLSX.utils.aoa_to_sheet([]);
-
-    function set(addr, value) {
-        ws[addr] = { v: value, t: typeof value === 'number' ? 'n' : 's' };
-    }
-
-    set('A1', company.name);
-    set('A2', company.address);
-    set('A3', `${company.zip} ${company.city}`);
-    set('A4', `email: ${company.email}`);
-    set('A5', `IČO: ${company.ico}   DIČ: ${company.dic}`);
-
-    set('F1', `Objednávka č. ${order.order_number}`);
-    set('A7', 'OBJEDNÁVKA');
-
-    set('A9', 'Dodávateľ');
-    set('F9', 'Odberateľ');
-
-    const rows = [
-        ['Meno', supplier.name, company.name],
-        ['Adresa', supplier.address, company.address],
-        ['PSČ / Mesto', `${supplier.zip || ''} ${supplier.city || ''}`.trim(), `${company.zip} ${company.city}`],
-        ['Vybavuje', supplier.contact_person || '', profile.full_name],
-        ['Telefón', supplier.phone || '', profile.phone || ''],
-        ['IČO', supplier.ico || '', company.ico],
-        ['DIČ', supplier.dic || '', company.dic]
-    ];
-
-    rows.forEach((row, i) => {
-        const r = 10 + i;
-        set(`A${r}`, row[0]);
-        set(`B${r}`, row[1]);
-        set(`F${r}`, row[0]);
-        set(`G${r}`, row[2]);
-    });
-
-    set('A18', 'Zákazka: ' + order.zakazka_cislo);
-    set('A19', order.intro_text || '');
-
-    const tpl = state.templates.find(t => t.code === order.template_code) || {};
-    let headerRow = 21;
-
-    if (tpl.show_quantity_columns) {
-        set(`A${headerRow}`, 'Počet');
-        set(`B${headerRow}`, 'Jedn.');
-        set(`C${headerRow}`, 'Popis');
-        set(`D${headerRow}`, 'Cena za jedn.');
-        set(`E${headerRow}`, 'CELKEM');
-    } else {
-        set(`A${headerRow}`, 'Popis');
-    }
-
-    let r = headerRow + 1;
-    items.forEach(it => {
-        if (tpl.show_quantity_columns) {
-            set(`A${r}`, it.quantity != null ? Number(it.quantity) : '');
-            set(`B${r}`, it.unit || '');
-            set(`C${r}`, it.description);
-            set(`D${r}`, it.unit_price != null ? Number(it.unit_price) : '');
-            set(`E${r}`, it.line_total != null ? Number(it.line_total) : '');
-        } else {
-            set(`A${r}`, it.description);
-        }
-        r++;
-    });
-
-    if (tpl.show_quantity_columns) {
-        set(`D${r}`, 'CELKEM');
-        set(`E${r}`, Number(order.total_amount));
-        r++;
-    }
-
-    r += 1;
-    if (order.billing_note) { set(`A${r}`, order.billing_note); r++; }
-    if (order.attachment_note) { set(`A${r}`, 'Prílohy: ' + order.attachment_note); r++; }
-
-    r += 1;
-    set(`A${r}`, 'Spôsob platby: ' + (PAYMENT_LABELS[order.payment_method] || order.payment_method));
-    r++;
-    set(`A${r}`, 'Dátum objednávky: ' + order.order_date);
-    r++;
-    if (order.delivery_date) { set(`A${r}`, 'Dátum dodania: ' + order.delivery_date); r++; }
-    if (order.doprava) { set(`A${r}`, 'Doprava: ' + order.doprava); r++; }
-    if (order.sprava) { set(`A${r}`, 'Správa: ' + order.sprava); r++; }
-    if (order.note) { set(`A${r}`, 'Poznámky: ' + order.note); r++; }
-
-    ws['!ref'] = `A1:G${r + 1}`;
-    ws['!cols'] = [
-        { wch: 14 }, { wch: 32 }, { wch: 10 }, { wch: 14 }, { wch: 14 }, { wch: 2 }, { wch: 30 }
-    ];
-
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Objednávka');
-
-    const filename = `Objednavka_${order.order_number.replace(/\//g, '-')}.xlsx`;
-    XLSX.writeFile(wb, filename);
-});
-
-// =====================================================================
-// TLAČ / PDF
-// =====================================================================
-el('print-button').addEventListener('click', () => {
-    const order = state.lastOrder;
-    const items = state.lastItems;
-    const company = state.selectedCompany;
-    const supplier = order.supplier_snapshot;
-    const profile = state.profile;
-    const tpl = state.templates.find(t => t.code === order.template_code) || {};
-
-    let itemsHtml = '';
-    if (tpl.show_quantity_columns) {
-        itemsHtml += '<table><thead><tr><th>Počet</th><th>Jedn.</th><th>Popis</th><th>Cena za jedn.</th><th>CELKEM</th></tr></thead><tbody>';
-        items.forEach(it => {
-            itemsHtml += `<tr><td>${it.quantity ?? ''}</td><td>${escapeHtml(it.unit || '')}</td><td>${escapeHtml(it.description)}</td>` +
-                `<td>${it.unit_price != null ? formatMoney(it.unit_price) : ''}</td><td>${it.line_total != null ? formatMoney(it.line_total) : ''}</td></tr>`;
-        });
-        itemsHtml += `<tr><td colspan="4" style="text-align:right;font-weight:bold;">CELKEM</td><td style="font-weight:bold;">${formatMoney(order.total_amount)}</td></tr>`;
-        itemsHtml += '</tbody></table>';
-    } else {
-        itemsHtml += '<table><thead><tr><th>Popis</th></tr></thead><tbody>';
-        items.forEach(it => {
-            itemsHtml += `<tr><td>${escapeHtml(it.description)}</td></tr>`;
-        });
-        itemsHtml += '</tbody></table>';
-    }
-
-    el('print-area').innerHTML = `
-        <h1>${escapeHtml(company.name)}</h1>
-        <p>${escapeHtml(company.address)}, ${escapeHtml(company.zip)} ${escapeHtml(company.city)}<br/>
-        IČO: ${escapeHtml(company.ico)} DIČ: ${escapeHtml(company.dic)} email: ${escapeHtml(company.email)}</p>
-        <h2>OBJEDNÁVKA č. ${escapeHtml(order.order_number)}</h2>
-        <table>
-            <tr><th>Dodávateľ</th><th>Odberateľ</th></tr>
-            <tr>
-                <td>
-                    ${escapeHtml(supplier.name)}<br/>
-                    ${escapeHtml(supplier.address)}<br/>
-                    ${escapeHtml(supplier.zip || '')} ${escapeHtml(supplier.city || '')}<br/>
-                    Vybavuje: ${escapeHtml(supplier.contact_person || '')}<br/>
-                    Telefón: ${escapeHtml(supplier.phone || '')}<br/>
-                    IČO: ${escapeHtml(supplier.ico || '')} DIČ: ${escapeHtml(supplier.dic || '')}
-                </td>
-                <td>
-                    ${escapeHtml(company.name)}<br/>
-                    ${escapeHtml(company.address)}<br/>
-                    ${escapeHtml(company.zip)} ${escapeHtml(company.city)}<br/>
-                    Vybavuje: ${escapeHtml(profile.full_name)}<br/>
-                    Telefón: ${escapeHtml(profile.phone || '')}<br/>
-                    IČO: ${escapeHtml(company.ico)} DIČ: ${escapeHtml(company.dic)}
-                </td>
-            </tr>
-        </table>
-        <p><strong>Zákazka:</strong> ${escapeHtml(order.zakazka_cislo)}</p>
-        <p>${escapeHtml(order.intro_text || '').replace(/\n/g, '<br/>')}</p>
-        ${itemsHtml}
-        ${order.billing_note ? `<p>${escapeHtml(order.billing_note)}</p>` : ''}
-        ${order.attachment_note ? `<p><strong>Prílohy:</strong> ${escapeHtml(order.attachment_note)}</p>` : ''}
-        <p>
-            Spôsob platby: ${escapeHtml(PAYMENT_LABELS[order.payment_method] || order.payment_method)}<br/>
-            Dátum objednávky: ${escapeHtml(order.order_date)}<br/>
-            ${order.delivery_date ? 'Dátum dodania: ' + escapeHtml(order.delivery_date) + '<br/>' : ''}
-            ${order.doprava ? 'Doprava: ' + escapeHtml(order.doprava) + '<br/>' : ''}
-            ${order.sprava ? 'Správa: ' + escapeHtml(order.sprava) + '<br/>' : ''}
-        </p>
-        ${order.note ? `<p><strong>Poznámky:</strong> ${escapeHtml(order.note)}</p>` : ''}
-    `;
-
-    window.print();
-});
-
-// ---------------------------------------------------------------------
-function escapeHtml(str) {
-    return String(str ?? '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
-}
-
-// =====================================================================
-// START
-// =====================================================================
-checkExistingSession();
-
+checkSession();
 </script>
 </body>
 </html>
