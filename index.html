@@ -28,6 +28,9 @@ header.topbar .user-info{font-size:13px;display:flex;align-items:center;gap:10px
 .order-item{padding:9px 12px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s;}
 .order-item:hover{background:#f0f5ff;}
 .order-item.active{background:#e0ebff;border-left:3px solid var(--primary);}
+.order-item.approved{background:#e9f7ee;}
+.order-item.approved:hover{background:#dcf0e3;}
+.order-item.approved.active{background:#cdeeda;border-left:3px solid #1e7e34;}
 .order-item .oi-num{font-weight:700;font-size:13px;color:var(--primary);}
 .order-item .oi-sup{font-size:12px;color:var(--text);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .order-item .oi-date{font-size:11px;color:var(--muted);margin-top:1px;}
@@ -491,80 +494,80 @@ td.total-cell{text-align:right;font-weight:600;white-space:nowrap;}
           <button id="result-new-btn">+ Nová objednávka</button>
         </div>
       </section>
+
+      <!-- ADMIN PANEL -->
+      <section class="card hidden" id="admin-panel">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+          <h2 style="margin:0;">⚙ Správa používateľov</h2>
+          <button id="admin-add-btn">+ Nový používateľ</button>
+        </div>
+        <div id="admin-error" class="banner error hidden"></div>
+
+        <!-- Zoznam používateľov -->
+        <div id="admin-user-list" style="margin-bottom:20px;"></div>
+
+        <!-- Formulár nového / editovaného používateľa -->
+        <div id="admin-form-wrap" class="hidden" style="border:1px solid var(--border);border-radius:var(--radius);padding:16px;background:#fafbfc;">
+          <h3 id="admin-form-title" style="margin:0 0 12px;">Nový používateľ</h3>
+          <div class="form-grid">
+            <div><label>Meno a priezvisko *</label><input id="af-name"/></div>
+            <div><label>Email (login) *</label><input type="email" id="af-email"/></div>
+            <div><label>Heslo *<span id="af-pass-hint" style="font-weight:400;color:var(--muted);"> (min. 8 znakov)</span></label>
+              <input type="password" id="af-password" placeholder="Pri editácii nechajte prázdne ak nemeníte"/>
+            </div>
+            <div><label>Iniciály * (napr. JB)</label><input id="af-initials" maxlength="5" style="text-transform:uppercase;"/></div>
+            <div><label>Stredisko</label><input id="af-stredisko" placeholder="ZA"/></div>
+            <div><label>Telefón</label><input id="af-phone" placeholder="+421 9xx xxx xxx"/></div>
+            <div>
+              <label>Oprávnenie na firmy *</label>
+              <div style="display:flex;gap:10px;margin-top:6px;" id="af-companies"></div>
+            </div>
+            <div>
+              <label>Rola v schvaľovacom procese</label>
+              <select id="af-approval-level">
+                <option value="0">Vystavovateľ (bez schvaľovacieho práva)</option>
+                <option value="1">Vedúci strediska (schvaľuje 1. úroveň)</option>
+                <option value="2">Riaditeľ (schvaľuje 2. úroveň)</option>
+              </select>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;padding-top:20px;">
+              <input type="checkbox" id="af-is-admin" style="width:auto;"/>
+              <label for="af-is-admin" style="margin:0;color:var(--text);font-weight:400;">Administrátor (správa používateľov)</label>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;padding-top:20px;">
+              <input type="checkbox" id="af-is-active" style="width:auto;" checked/>
+              <label for="af-is-active" style="margin:0;color:var(--text);font-weight:400;">Aktívny účet</label>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:14px;">
+            <button id="af-save-btn">💾 Uložiť</button>
+            <button class="secondary" id="af-cancel-btn">Zrušiť</button>
+          </div>
+        </div>
+
+        <!-- PODPISY SCHVAĽOVATEĽOV -->
+        <div style="margin-top:30px;border-top:1px solid var(--border);padding-top:20px;">
+          <h3 style="margin-bottom:6px;">✍️ Podpisy schvaľovateľov</h3>
+          <p style="color:var(--muted);font-size:13px;margin-bottom:14px;">
+            Nahrajte naskenovaný podpis (PNG, ideálne s priehľadným pozadím) pre každého
+            schvaľovateľa (vedúci L1 / riaditeľ L2). Podpis sa automaticky vloží do PDF
+            a Excelu pri schválení danej úrovne.
+          </p>
+          <div id="admin-signatures-list"></div>
+        </div>
+
+        <!-- PEČIATKY FIRIEM -->
+        <div style="margin-top:30px;border-top:1px solid var(--border);padding-top:20px;">
+          <h3 style="margin-bottom:6px;">🔖 Pečiatky firiem</h3>
+          <p style="color:var(--muted);font-size:13px;margin-bottom:14px;">
+            Pečiatka sa vloží do PDF/Excelu pri PLNOM schválení objednávky (po 2. úrovni).
+          </p>
+          <div id="admin-stamps-list"></div>
+        </div>
+      </section>
     </div>
   </div>
 </div>
-
-<!-- ADMIN PANEL -->
-<section class="card hidden" id="admin-panel">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-    <h2 style="margin:0;">⚙ Správa používateľov</h2>
-    <button id="admin-add-btn">+ Nový používateľ</button>
-  </div>
-  <div id="admin-error" class="banner error hidden"></div>
-
-  <!-- Zoznam používateľov -->
-  <div id="admin-user-list" style="margin-bottom:20px;"></div>
-
-  <!-- Formulár nového / editovaného používateľa -->
-  <div id="admin-form-wrap" class="hidden" style="border:1px solid var(--border);border-radius:var(--radius);padding:16px;background:#fafbfc;">
-    <h3 id="admin-form-title" style="margin:0 0 12px;">Nový používateľ</h3>
-    <div class="form-grid">
-      <div><label>Meno a priezvisko *</label><input id="af-name"/></div>
-      <div><label>Email (login) *</label><input type="email" id="af-email"/></div>
-      <div><label>Heslo *<span id="af-pass-hint" style="font-weight:400;color:var(--muted);"> (min. 8 znakov)</span></label>
-        <input type="password" id="af-password" placeholder="Pri editácii nechajte prázdne ak nemeníte"/>
-      </div>
-      <div><label>Iniciály * (napr. JB)</label><input id="af-initials" maxlength="5" style="text-transform:uppercase;"/></div>
-      <div><label>Stredisko</label><input id="af-stredisko" placeholder="ZA"/></div>
-      <div><label>Telefón</label><input id="af-phone" placeholder="+421 9xx xxx xxx"/></div>
-      <div>
-        <label>Oprávnenie na firmy *</label>
-        <div style="display:flex;gap:10px;margin-top:6px;" id="af-companies"></div>
-      </div>
-      <div>
-        <label>Rola v schvaľovacom procese</label>
-        <select id="af-approval-level">
-          <option value="0">Vystavovateľ (bez schvaľovacieho práva)</option>
-          <option value="1">Vedúci strediska (schvaľuje 1. úroveň)</option>
-          <option value="2">Riaditeľ (schvaľuje 2. úroveň)</option>
-        </select>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px;padding-top:20px;">
-        <input type="checkbox" id="af-is-admin" style="width:auto;"/>
-        <label for="af-is-admin" style="margin:0;color:var(--text);font-weight:400;">Administrátor (správa používateľov)</label>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px;padding-top:20px;">
-        <input type="checkbox" id="af-is-active" style="width:auto;" checked/>
-        <label for="af-is-active" style="margin:0;color:var(--text);font-weight:400;">Aktívny účet</label>
-      </div>
-    </div>
-    <div style="display:flex;gap:8px;margin-top:14px;">
-      <button id="af-save-btn">💾 Uložiť</button>
-      <button class="secondary" id="af-cancel-btn">Zrušiť</button>
-    </div>
-  </div>
-
-  <!-- PODPISY SCHVAĽOVATEĽOV -->
-  <div style="margin-top:30px;border-top:1px solid var(--border);padding-top:20px;">
-    <h3 style="margin-bottom:6px;">✍️ Podpisy schvaľovateľov</h3>
-    <p style="color:var(--muted);font-size:13px;margin-bottom:14px;">
-      Nahrajte naskenovaný podpis (PNG, ideálne s priehľadným pozadím) pre každého
-      schvaľovateľa (vedúci L1 / riaditeľ L2). Podpis sa automaticky vloží do PDF
-      a Excelu pri schválení danej úrovne.
-    </p>
-    <div id="admin-signatures-list"></div>
-  </div>
-
-  <!-- PEČIATKY FIRIEM -->
-  <div style="margin-top:30px;border-top:1px solid var(--border);padding-top:20px;">
-    <h3 style="margin-bottom:6px;">🔖 Pečiatky firiem</h3>
-    <p style="color:var(--muted);font-size:13px;margin-bottom:14px;">
-      Pečiatka sa vloží do PDF/Excelu pri PLNOM schválení objednávky (po 2. úrovni).
-    </p>
-    <div id="admin-stamps-list"></div>
-  </div>
-</section>
 
 <div id="print-area"></div>
 
@@ -677,7 +680,8 @@ function renderSidebar(q) {
   list.innerHTML = '';
   filtered.forEach(o => {
     const d = document.createElement('div');
-    d.className = 'order-item' + (S.viewOrder?.id===o.id ? ' active' : '');
+    const isApproved = o.status === 'schvalena';
+    d.className = 'order-item' + (S.viewOrder?.id===o.id ? ' active' : '') + (isApproved ? ' approved' : '');
     d.innerHTML = `<div class="oi-num">${esc(o.order_number)}</div>
       <div class="oi-sup">${esc(o.supplier_snapshot?.name||'—')}</div>
       <div class="oi-date">${fmtD(o.order_date)}${o.total_amount?' · '+fmt(o.total_amount):''}</div>`;
@@ -745,12 +749,15 @@ async function renderDashboard() {
   const monthOrders = S.orders.filter(o => (o.order_date||'').startsWith(thisMonth));
   const monthTotal = monthOrders.reduce((s,o)=>s+(Number(o.total_amount)||0),0);
 
+  const myApprovedCount = myOrders.filter(o => o.status === 'schvalena').length;
+
   const stats = [
     {label:'Čaká na moje schválenie', value:waitingForMe.length, color:'#e67e22', filter:{pendingApproverId:myId}},
     {label:'Vrátené mi na opravu', value:returnedToMe.length, color:'#c0392b', filter:{createdBy:myId, status:'vystavena', onlyReturned:true}},
     {label:'Moje rozpracované', value:draftMine.length, color:'#6b7785', filter:{createdBy:myId, status:'vystavena', onlyDraft:true}},
     {label:'V procese schvaľovania', value:pendingMine.length, color:'#2980b9', filter:{createdBy:myId, statusIn:['caka_L1','schvalena_L1','caka_L2']}},
     {label:'Mnou postúpené ďalej', value:postupeneMnou.length, color:'#8e44ad', filter:{ids:postupeneMnou.map(o=>o.id)}},
+    {label:'Moje plne schválené', value:myApprovedCount, color:'#1e7e34', filter:{createdBy:myId, status:'schvalena'}},
     {label:'Objednávky tento mesiac', value:monthOrders.length, color:'#1f5fa8', filter:{month:thisMonth}},
     {label:'Suma tento mesiac', value:fmt(monthTotal), color:'#1e7e34', filter:{month:thisMonth}},
     {label:'Všetky objednávky', value:S.orders.length, color:'#1c2733', filter:{}},
