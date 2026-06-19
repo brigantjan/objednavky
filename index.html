@@ -544,6 +544,26 @@ td.total-cell{text-align:right;font-weight:600;white-space:nowrap;}
       <button class="secondary" id="af-cancel-btn">Zrušiť</button>
     </div>
   </div>
+
+  <!-- PODPISY SCHVAĽOVATEĽOV -->
+  <div style="margin-top:30px;border-top:1px solid var(--border);padding-top:20px;">
+    <h3 style="margin-bottom:6px;">✍️ Podpisy schvaľovateľov</h3>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:14px;">
+      Nahrajte naskenovaný podpis (PNG, ideálne s priehľadným pozadím) pre každého
+      schvaľovateľa (vedúci L1 / riaditeľ L2). Podpis sa automaticky vloží do PDF
+      a Excelu pri schválení danej úrovne.
+    </p>
+    <div id="admin-signatures-list"></div>
+  </div>
+
+  <!-- PEČIATKY FIRIEM -->
+  <div style="margin-top:30px;border-top:1px solid var(--border);padding-top:20px;">
+    <h3 style="margin-bottom:6px;">🔖 Pečiatky firiem</h3>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:14px;">
+      Pečiatka sa vloží do PDF/Excelu pri PLNOM schválení objednávky (po 2. úrovni).
+    </p>
+    <div id="admin-stamps-list"></div>
+  </div>
 </section>
 
 <div id="print-area"></div>
@@ -711,9 +731,11 @@ async function renderDashboard() {
   const returnedToMe    = myOrders.filter(o => o.status === 'vystavena' && o.rejection_note);
   const draftMine       = myOrders.filter(o => o.status === 'vystavena' && !o.rejection_note);
   const pendingMine     = myOrders.filter(o => ['caka_L1','schvalena_L1','caka_L2'].includes(o.status));
-  // Objednávky, ktoré NIE sú moje, ale ktoré som JA schválil a postúpil ďalej (alebo už sú plne schválené) - sledujem ich osud
+  // Objednávky, ktoré NIE sú moje, ale ktoré som JA schválil a postúpil ďalej -
+  // sledujem ich, KÝM sa definitívne neuzavrú (plne schválené alebo zamietnuté).
+  // Akonáhle dostanú finálny status, miznú odtiaľto (vystavovateľ má svoj dashboard).
   const postupeneMnou   = S.orders.filter(o => o.created_by !== myId && myApprovedOrderIds.has(o.id)
-                              && ['caka_L2','schvalena_L1','schvalena'].includes(o.status));
+                              && ['caka_L2','schvalena_L1'].includes(o.status));
   const approvedRecent  = myOrders.filter(o => o.status === 'schvalena')
                                   .sort((a,b)=> new Date(b.updated_at||b.order_date) - new Date(a.updated_at||a.order_date))
                                   .slice(0,5);
@@ -1272,6 +1294,31 @@ async function buildXlsx(order, items) {
   const comp=S.companies.find(c=>c.code===order.company_code)||{};
   const sup=order.supplier_snapshot||{};
   const tpl=S.templates.find(t=>t.code===order.template_code)||{};
+
+  // Načítaj podpisy schválenia + pečiatku (rovnaká logika ako v tlačovom PDF)
+  const {data:approvalHist} = await supabaseClient.from('approvals')
+    .select('*').eq('order_id',order.id).eq('action','schvalene').order('level');
+  let sigL1Data=null, sigL2Data=null, sigL1Name='', sigL2Name='', sigL1Date='', sigL2Date='';
+  let stampData=null;
+  if (approvalHist && approvalHist.length>0) {
+    if (!S.profiles) {
+      const {data:profs} = await supabaseClient.from('profiles').select('*');
+      S.profiles = profs||[];
+    }
+    const {data:sigs} = await supabaseClient.from('signatures').select('*');
+    for (const h of approvalHist) {
+      const approver = S.profiles.find(p=>p.id===h.approver_id);
+      const sig = (sigs||[]).find(s=>s.profile_id===h.approver_id);
+      if (h.level===1) { sigL1Data=sig?.signature_b64||null; sigL1Name=approver?.full_name||''; sigL1Date=fmtD(h.approved_at?.slice(0,10)); }
+      if (h.level===2) { sigL2Data=sig?.signature_b64||null; sigL2Name=approver?.full_name||''; sigL2Date=fmtD(h.approved_at?.slice(0,10)); }
+    }
+  }
+  if (order.status === 'schvalena') {
+    const {data:stamp} = await supabaseClient.from('company_stamps')
+      .select('*').eq('company_code', order.company_code).maybeSingle();
+    stampData = stamp?.stamp_b64 || null;
+  }
+
   const wb=new ExcelJS.Workbook();
   const ws=wb.addWorksheet('Objednávka');
   ws.pageSetup.paperSize=9; ws.pageSetup.orientation='portrait';
@@ -1424,9 +1471,10 @@ async function buildXlsx(order, items) {
   }
 
   // ── Ukotvenie spodnej časti na dolnú polovicu A4 ──────────────────────
-  // Spodná sekcia (Podrobnosti platby + Schválenie + Poznámky) zaberá ~20 riadkov.
-  // Fixovaný začiatok = riadok 52. Ak je obsah kratší, dopĺňame prázdne riadky.
-  const BOTTOM_START = 52;
+  // Spodná sekcia (Podrobnosti platby + Schválenie s podpismi + Poznámky)
+  // teraz zaberá cca 21 riadkov (vrátane podpisov a pečiatky).
+  // BOTTOM_START prepočítaný tak, aby sa celý dokument vždy zmestil na 1 A4 stranu.
+  const BOTTOM_START = 33;
   while(r < BOTTOM_START - 1) { r++; ws.getRow(r).height=14; }
 
   // Platba
@@ -1456,20 +1504,53 @@ async function buildXlsx(order, items) {
   r+=2; ws.getRow(r).height=6;
   M(r,2,r,17); ws.getCell(r,2).border={top:ME};
 
-  // Schválenie
+  // Schválenie - rozdelené na dva stĺpce (L1 / L2) s podpismi
   r++; ws.getRow(r).height=14;
-  M(r,2,r,11); SC(r,2,'Schválenie',{bold:true});
+  M(r,2,r,17); SC(r,2,'Schválenie',{bold:true});
   const ar=r;
-  for(let i=1;i<=4;i++){
-    r++; ws.getRow(r).height=14; M(r,2,r,11);
-    ws.getCell(r,2).border=SB(i===1,i===4);
+  // Hlavičky úrovní
+  r++; ws.getRow(r).height=14;
+  M(r,2,r,8); SC(r,2,'1. úroveň (vedúci strediska)',{bold:true,sz:9});
+  M(r,9,r,17); SC(r,9,'2. úroveň (riaditeľ)',{bold:true,sz:9});
+  const sigRowStart = r+1;
+  // Riadky na podpis (4 riadky vysoké pre obrázok)
+  for(let i=0;i<4;i++){
+    r++; ws.getRow(r).height = i===0?10:16;
+    M(r,2,r,8); SC(r,2,null);
+    ws.getCell(r,2).border = SB(i===0,false);
+    M(r,9,r,17); SC(r,9,null);
+    ws.getCell(r,9).border = SB(i===0,false);
   }
+  // Mená a dátumy pod podpismi
+  r++; ws.getRow(r).height=13;
+  M(r,2,r,8); SC(r,2, sigL1Name ? (sigL1Name+' · '+sigL1Date) : 'nepodpísané', {sz:9, italic:!sigL1Name});
+  ws.getCell(r,2).border = SB(false,true);
+  M(r,9,r,17); SC(r,9, sigL2Name ? (sigL2Name+' · '+sigL2Date) : 'nepodpísané', {sz:9, italic:!sigL2Name});
+  ws.getCell(r,9).border = SB(false,true);
+
+  // Vlož obrázky podpisov, ak existujú
+  if (sigL1Data) {
+    const imgId = wb.addImage({base64:sigL1Data, extension:'png'});
+    ws.addImage(imgId, {tl:{col:2.2, row:sigRowStart-1+0.3}, ext:{width:110, height:35}});
+  }
+  if (sigL2Data) {
+    const imgId = wb.addImage({base64:sigL2Data, extension:'png'});
+    ws.addImage(imgId, {tl:{col:9.2, row:sigRowStart-1+0.3}, ext:{width:110, height:35}});
+  }
+  // Pečiatka (len pri plnom schválení) - vpravo dole pri L2 podpise
+  if (stampData) {
+    const stampId = wb.addImage({base64:stampData, extension:'png'});
+    ws.addImage(stampId, {tl:{col:13.5, row:sigRowStart-1+0.2}, ext:{width:75, height:60}});
+  }
+
   const ir=ar+1;
-  [['Dátum',order.order_date||''],['Objedn. č.',order.order_number],
-   ['Správa',order.sprava||''],['Doprava',order.doprava||'']].forEach(([l,v],i)=>{
-    M(ir+i,13,ir+i,14); SC(ir+i,13,l);
-    M(ir+i,15,ir+i,17); SC(ir+i,15,v,{b:true});
-  });
+  // Správa a Doprava (Dátum a Objedn.č. sú už v hlavičke dokumentu)
+  if (order.sprava || order.doprava) {
+    r++; ws.getRow(r).height=13;
+    const infoTxt = [order.sprava?('Správa: '+order.sprava):null, order.doprava?('Doprava: '+order.doprava):null]
+      .filter(Boolean).join('   |   ');
+    M(r,2,r,17); SC(r,2,infoTxt,{sz:9});
+  }
 
   // Poznámky
   r++; ws.getRow(r).height=14;
@@ -1508,6 +1589,7 @@ async function printOrder(order, items) {
     .select('*').eq('order_id',order.id).eq('action','schvalene').order('level');
   let sigL1Html = '<p style="color:#999;font-size:10px;">nepodpísané</p>';
   let sigL2Html = '<p style="color:#999;font-size:10px;">nepodpísané</p>';
+  let stampHtml = '';
   if (hist && hist.length>0) {
     if (!S.profiles) {
       const {data:profs} = await supabaseClient.from('profiles').select('*');
@@ -1521,6 +1603,14 @@ async function printOrder(order, items) {
       const block = `${sigImg}<p style="font-size:10px;margin-top:2px;">${esc(approver?.full_name||'')}<br/>${fmtD(h.approved_at?.slice(0,10))}</p>`;
       if (h.level===1) sigL1Html = block;
       if (h.level===2) sigL2Html = block;
+    }
+  }
+  // Pečiatka firmy - len pri PLNE schválenej objednávke (po L2)
+  if (order.status === 'schvalena') {
+    const {data:stamp} = await supabaseClient.from('company_stamps')
+      .select('*').eq('company_code', order.company_code).maybeSingle();
+    if (stamp) {
+      stampHtml = `<img src="data:image/png;base64,${stamp.stamp_b64}" style="max-height:70px;max-width:120px;position:absolute;right:10px;bottom:6px;opacity:0.92;"/>`;
     }
   }
 
@@ -1573,7 +1663,7 @@ body{font-family:Calibri,Arial,sans-serif;font-size:11px;padding:12mm 15mm;displ
 .info-box{border:1px solid #000;padding:6px;font-size:10px;line-height:1.7;}
 .sep{border-top:2px solid #000;margin:8px 0 4px;}
 .appr{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:4px;}
-.appr-box{border:1px solid #000;min-height:45px;padding:5px;font-size:10px;}
+.appr-box{border:1px solid #000;min-height:75px;padding:5px;font-size:10px;position:relative;}
 .appr-box h4{font-weight:bold;margin-bottom:3px;}
 .notes-box{border:1px solid #000;min-height:30px;padding:5px;margin-top:5px;font-size:10px;}
 @media print{@page{size:A4;margin:10mm 15mm;} body{padding:0;min-height:277mm;}}
@@ -1631,9 +1721,9 @@ ${order.attachment_note?`<p class="note-text"><strong>Prílohy:</strong> ${esc(o
   </div>
 </div>
 <div class="sep"></div>
-<div class="appr">
+<div class="appr" style="position:relative;">
   <div class="appr-box" id="appr-box-l1"><h4>Schválil (1. úroveň – vedúci strediska)</h4>${sigL1Html}</div>
-  <div class="appr-box" id="appr-box-l2"><h4>Schválil (2. úroveň – riaditeľ)</h4>${sigL2Html}</div>
+  <div class="appr-box" id="appr-box-l2" style="position:relative;"><h4>Schválil (2. úroveň – riaditeľ)</h4>${sigL2Html}${stampHtml}</div>
 </div>
 ${order.note?`<div class="notes-box"><strong>Poznámky / pripomienky:</strong><br/>${esc(order.note)}</div>`:'<div class="notes-box"><strong>Poznámky / pripomienky</strong></div>'}
 </div>
@@ -2060,6 +2150,8 @@ el('admin-btn').addEventListener('click', async () => {
   el('admin-error').classList.add('hidden');
   await loadAdminUserList();
   buildCompanyCheckboxes(null);
+  await renderSignaturesAdmin();
+  await renderStampsAdmin();
 });
 
 async function loadAdminUserList() {
@@ -2416,6 +2508,101 @@ el('rf-export-btn').addEventListener('click', () => {
     a.click();
   });
 });
+
+// ── PODPISY SCHVAĽOVATEĽOV (admin) ──────────────────────────────────────────
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(',')[1]); // bez "data:image/png;base64," prefixu
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function renderSignaturesAdmin() {
+  const approvers = (S.adminUsers || []).filter(u => (u.approval_level||0) >= 1);
+  const {data: sigs} = await supabaseClient.from('signatures').select('*');
+  const sigMap = new Map((sigs||[]).map(s=>[s.profile_id, s]));
+
+  const wrap = el('admin-signatures-list');
+  if (!approvers.length) {
+    wrap.innerHTML = '<p style="color:var(--muted);font-size:13px;">Zatiaľ žiadny používateľ nemá rolu schvaľovateľa (nastavte to vo formulári vyššie).</p>';
+    return;
+  }
+
+  wrap.innerHTML = approvers.map(u => {
+    const sig = sigMap.get(u.id);
+    const levelLabel = u.approval_level === 2 ? 'Riaditeľ L2' : 'Vedúci L1';
+    return `<div style="display:flex;align-items:center;gap:16px;padding:12px;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:8px;">
+      <div style="width:160px;">
+        <strong>${esc(u.full_name)}</strong><br/>
+        <span style="font-size:12px;color:var(--muted);">${levelLabel}</span>
+      </div>
+      <div style="width:140px;height:50px;border:1px dashed var(--border);display:flex;align-items:center;justify-content:center;background:#fafbfc;">
+        ${sig ? `<img src="data:image/png;base64,${sig.signature_b64}" style="max-width:130px;max-height:46px;"/>` : '<span style="font-size:11px;color:var(--muted);">žiadny podpis</span>'}
+      </div>
+      <div>
+        <input type="file" accept="image/png,image/jpeg" id="sig-file-${u.id}" style="display:none;"
+               onchange="window.__uploadSignature('${u.id}', this.files[0])"/>
+        <button type="button" class="secondary" style="font-size:12px;padding:6px 10px;"
+                onclick="document.getElementById('sig-file-${u.id}').click()">📤 ${sig?'Nahradiť':'Nahrať'} podpis</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+window.__uploadSignature = async function(userId, file) {
+  if (!file) return;
+  if (file.size > 1024*1024) { alert('Obrázok je príliš veľký (max 1 MB). Zmenšite ho a skúste znova.'); return; }
+  try {
+    const b64 = await fileToBase64(file);
+    const {error} = await supabaseClient.from('signatures').upsert({
+      profile_id: userId, signature_b64: b64, updated_at: new Date().toISOString()
+    });
+    if (error) { alert('Chyba pri nahrávaní podpisu: ' + error.message); return; }
+    await renderSignaturesAdmin();
+  } catch(e) {
+    alert('Chyba pri spracovaní súboru: ' + e.message);
+  }
+};
+
+// ── PEČIATKY FIRIEM (admin) ─────────────────────────────────────────────────
+async function renderStampsAdmin() {
+  const {data: stamps} = await supabaseClient.from('company_stamps').select('*');
+  const stampMap = new Map((stamps||[]).map(s=>[s.company_code, s]));
+
+  const wrap = el('admin-stamps-list');
+  wrap.innerHTML = S.companies.map(c => {
+    const stamp = stampMap.get(c.code);
+    return `<div style="display:flex;align-items:center;gap:16px;padding:12px;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:8px;">
+      <div style="width:160px;"><strong>${esc(c.name)}</strong><br/><span style="font-size:12px;color:var(--muted);">${esc(c.code)}</span></div>
+      <div style="width:140px;height:70px;border:1px dashed var(--border);display:flex;align-items:center;justify-content:center;background:#fafbfc;">
+        ${stamp ? `<img src="data:image/png;base64,${stamp.stamp_b64}" style="max-width:130px;max-height:66px;"/>` : '<span style="font-size:11px;color:var(--muted);">žiadna pečiatka</span>'}
+      </div>
+      <div>
+        <input type="file" accept="image/png,image/jpeg" id="stamp-file-${c.code}" style="display:none;"
+               onchange="window.__uploadStamp('${c.code}', this.files[0])"/>
+        <button type="button" class="secondary" style="font-size:12px;padding:6px 10px;"
+                onclick="document.getElementById('stamp-file-${c.code}').click()">📤 ${stamp?'Nahradiť':'Nahrať'} pečiatku</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+window.__uploadStamp = async function(companyCode, file) {
+  if (!file) return;
+  if (file.size > 1024*1024) { alert('Obrázok je príliš veľký (max 1 MB). Zmenšite ho a skúste znova.'); return; }
+  try {
+    const b64 = await fileToBase64(file);
+    const {error} = await supabaseClient.from('company_stamps').upsert({
+      company_code: companyCode, stamp_b64: b64, updated_at: new Date().toISOString()
+    });
+    if (error) { alert('Chyba pri nahrávaní pečiatky: ' + error.message); return; }
+    await renderStampsAdmin();
+  } catch(e) {
+    alert('Chyba pri spracovaní súboru: ' + e.message);
+  }
+};
 
 checkSession();
 </script>
