@@ -170,7 +170,13 @@ td.total-cell{text-align:right;font-weight:600;white-space:nowrap;}
             <h3 style="margin-bottom:10px;">Schválenie 1. úrovne (vedúci strediska)</h3>
             <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;">
               <button id="ap-approve-l1-btn" style="background:#1e7e34;border-color:#1e7e34;">✓ Schváliť</button>
+              <button class="secondary" style="border-color:#e67e22;color:#e67e22;" id="ap-return-l1-btn">↩ Vrátiť na opravu</button>
               <button class="danger" style="padding:8px 14px;font-size:13px;" id="ap-reject-l1-btn">✗ Zamietnuť</button>
+            </div>
+            <div id="ap-return-note-wrap" class="hidden" style="margin-top:10px;max-width:500px;">
+              <label>Dôvod vrátenia *</label>
+              <textarea id="ap-return-note" rows="2" placeholder="Čo treba opraviť..."></textarea>
+              <button id="ap-return-confirm-btn" style="margin-top:6px;background:#e67e22;border-color:#e67e22;">Potvrdiť vrátenie</button>
             </div>
             <div id="ap-reject-note-wrap" class="hidden" style="margin-top:10px;max-width:500px;">
               <label>Dôvod zamietnutia *</label>
@@ -198,7 +204,13 @@ td.total-cell{text-align:right;font-weight:600;white-space:nowrap;}
             <h3 style="margin-bottom:10px;">Schválenie 2. úrovne (riaditeľ)</h3>
             <div style="display:flex;gap:8px;flex-wrap:wrap;">
               <button id="ap-approve-l2-btn" style="background:#1e7e34;border-color:#1e7e34;">✓ Schváliť</button>
+              <button class="secondary" style="border-color:#e67e22;color:#e67e22;" id="ap-return-l2-btn">↩ Vrátiť na opravu</button>
               <button class="danger" style="padding:8px 14px;font-size:13px;" id="ap-reject-l2-btn">✗ Zamietnuť</button>
+            </div>
+            <div id="ap-return-l2-note-wrap" class="hidden" style="margin-top:10px;max-width:500px;">
+              <label>Dôvod vrátenia *</label>
+              <textarea id="ap-return-l2-note" rows="2" placeholder="Čo treba opraviť..."></textarea>
+              <button id="ap-return-l2-confirm-btn" style="margin-top:6px;background:#e67e22;border-color:#e67e22;">Potvrdiť vrátenie</button>
             </div>
             <div id="ap-reject-l2-note-wrap" class="hidden" style="margin-top:10px;max-width:500px;">
               <label>Dôvod zamietnutia *</label>
@@ -926,7 +938,11 @@ async function buildXlsx(order, items) {
   const tpl=S.templates.find(t=>t.code===order.template_code)||{};
   const wb=new ExcelJS.Workbook();
   const ws=wb.addWorksheet('Objednávka');
-  ws.pageSetup.paperSize=9; ws.pageSetup.orientation='portrait'; ws.pageSetup.fitToPage=true;
+  ws.pageSetup.paperSize=9; ws.pageSetup.orientation='portrait';
+  ws.pageSetup.fitToPage=false;   // NIKDY nezmenšovať obsah na stranu
+  ws.pageSetup.fitToWidth=0;
+  ws.pageSetup.fitToHeight=0;
+  ws.pageSetup.scale=100;          // tlač na 100% veľkosti
   ws.pageSetup.margins={left:0.4,right:0.4,top:0.6,bottom:0.6,header:0,footer:0};
 
   [1.3,0.4,3.7,8.7,7.7,3.7,3.0,3.0,4.7,9.7,2.7,8.7,7.7,4.7,5.7,5.7,12.7,3.7,0.4]
@@ -1147,13 +1163,30 @@ async function exportExcel(order, items) {
 
 // printOrder - rovnaký xlsx, otvorí sa v novom okne a vytlačí
 async function printOrder(order, items) {
-  const buf=await buildXlsx(order,items);
-  // Otvorí xlsx ako blob URL - prehliadač ho stiahne a užívateľ ho otvorí v Exceli / LibreOffice a vytlačí
-  // Alternatíva: stiahni ako PDF cez tlačové CSS (render do iframe)
-  // Použijeme HTML render (identický layout) v iframe a window.print()
   const comp=S.companies.find(c=>c.code===order.company_code)||{};
   const sup=order.supplier_snapshot||{};
   const tpl=S.templates.find(t=>t.code===order.template_code)||{};
+
+  // Načítaj schválenia a podpisy (ak existujú)
+  const {data:hist} = await supabaseClient.from('approvals')
+    .select('*').eq('order_id',order.id).eq('action','schvalene').order('level');
+  let sigL1Html = '<p style="color:#999;font-size:10px;">nepodpísané</p>';
+  let sigL2Html = '<p style="color:#999;font-size:10px;">nepodpísané</p>';
+  if (hist && hist.length>0) {
+    if (!S.profiles) {
+      const {data:profs} = await supabaseClient.from('profiles').select('*');
+      S.profiles = profs||[];
+    }
+    const {data:sigs} = await supabaseClient.from('signatures').select('*');
+    for (const h of hist) {
+      const approver = S.profiles.find(p=>p.id===h.approver_id);
+      const sig = (sigs||[]).find(s=>s.profile_id===h.approver_id);
+      const sigImg = sig ? `<img src="data:image/png;base64,${sig.signature_b64}" style="max-height:40px;max-width:140px;display:block;margin-bottom:2px;"/>` : '';
+      const block = `${sigImg}<p style="font-size:10px;margin-top:2px;">${esc(approver?.full_name||'')}<br/>${fmtD(h.approved_at?.slice(0,10))}</p>`;
+      if (h.level===1) sigL1Html = block;
+      if (h.level===2) sigL2Html = block;
+    }
+  }
 
   let iHtml='';
   if(tpl.show_quantity_columns){
@@ -1180,7 +1213,11 @@ async function printOrder(order, items) {
 <title>Objednávka ${esc(order.order_number)}</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:Calibri,Arial,sans-serif;font-size:11px;padding:12mm 15mm;}
+html,body{height:100%;}
+body{font-family:Calibri,Arial,sans-serif;font-size:11px;padding:12mm 15mm;display:flex;flex-direction:column;min-height:297mm;}
+.top-content{flex:0 0 auto;}
+.spacer{flex:1 1 auto;min-height:10mm;}
+.bottom-content{flex:0 0 auto;}
 .hdr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;}
 .co{font-size:10px;line-height:1.5;}
 .on{font-size:11px;font-weight:bold;text-align:right;}
@@ -1203,8 +1240,9 @@ body{font-family:Calibri,Arial,sans-serif;font-size:11px;padding:12mm 15mm;}
 .appr-box{border:1px solid #000;min-height:45px;padding:5px;font-size:10px;}
 .appr-box h4{font-weight:bold;margin-bottom:3px;}
 .notes-box{border:1px solid #000;min-height:30px;padding:5px;margin-top:5px;font-size:10px;}
-@media print{@page{size:A4;margin:10mm 15mm;} body{padding:0;}}
+@media print{@page{size:A4;margin:10mm 15mm;} body{padding:0;min-height:277mm;}}
 </style></head><body>
+<div class="top-content">
 <div class="hdr">
   <div style="display:flex;gap:10px;align-items:flex-start">
     <img src="data:image/png;base64,${LOGO_B64}" style="height:52px;"/>
@@ -1238,6 +1276,9 @@ ${order.billing_note?`<p class="note-text">${esc(order.billing_note).replace(/\n
 ${esc(comp.name)}, ${esc(comp.address)}, ${esc(comp.zip)} ${esc(comp.city)}<br/>
 ${esc(comp.email)}<br/>Splatnosť faktúry: ${comp.invoice_due_days||45} dní od dodania</p>
 ${order.attachment_note?`<p class="note-text"><strong>Prílohy:</strong> ${esc(order.attachment_note)}</p>`:''}
+</div>
+<div class="spacer"></div>
+<div class="bottom-content">
 <div class="bottom">
   <div class="pay-box">
     <strong>Podrobnosti platby</strong><br/>
@@ -1255,10 +1296,11 @@ ${order.attachment_note?`<p class="note-text"><strong>Prílohy:</strong> ${esc(o
 </div>
 <div class="sep"></div>
 <div class="appr">
-  <div class="appr-box"><h4>Schválenie</h4></div>
-  <div></div>
+  <div class="appr-box" id="appr-box-l1"><h4>Schválil (1. úroveň – vedúci strediska)</h4>${sigL1Html}</div>
+  <div class="appr-box" id="appr-box-l2"><h4>Schválil (2. úroveň – riaditeľ)</h4>${sigL2Html}</div>
 </div>
 ${order.note?`<div class="notes-box"><strong>Poznámky / pripomienky:</strong><br/>${esc(order.note)}</div>`:'<div class="notes-box"><strong>Poznámky / pripomienky</strong></div>'}
+</div>
 <script>window.onload=function(){window.print();}<\/script>
 </body></html>`;
 
@@ -1380,6 +1422,14 @@ async function loadApprovalPanel(order) {
   ['ap-submit-l1','ap-approve-l1','ap-submit-l2','ap-approve-l2','ap-rejected-info'].forEach(id=>{
     el(id).classList.add('hidden');
   });
+  el('ap-return-note-wrap').classList.add('hidden');
+  el('ap-reject-note-wrap').classList.add('hidden');
+  el('ap-return-l2-note-wrap').classList.add('hidden');
+  el('ap-reject-l2-note-wrap').classList.add('hidden');
+  // Vymaž predošlé dynamicky vložené varovania/info správy
+  document.getElementById('ap-info-msg')?.remove();
+  el('ap-submit-l1').querySelectorAll('p').forEach(p=>p.remove());
+  el('ap-submit-l2').querySelectorAll('p').forEach(p=>p.remove());
 
   // Load approvers list if not loaded yet
   if (!S.profiles) {
@@ -1395,8 +1445,11 @@ async function loadApprovalPanel(order) {
     histDiv.innerHTML = '<strong style="font-size:12px;color:var(--muted)">História schválení:</strong>';
     hist.forEach(h => {
       const approver = S.profiles.find(p=>p.id===h.approver_id);
+      const actionLabel = h.action==='schvalene' ? '✓ Schválené'
+                         : h.action==='vratene' ? '↩ Vrátené na opravu'
+                         : '✗ Zamietnuté';
       histDiv.innerHTML += `<div style="font-size:12px;margin-top:4px;padding:6px;background:#f8f9fa;border-radius:4px;">
-        <strong>${h.action==='schvalene'?'✓ Schválené':'✗ Zamietnuté'}</strong> – Úroveň ${h.level}
+        <strong>${actionLabel}</strong> – Úroveň ${h.level}
         – ${approver?.full_name||'?'} – ${fmtD(h.approved_at.slice(0,10))}
         ${h.note?`<br/><em style="color:var(--muted)">${esc(h.note)}</em>`:''}
       </div>`;
@@ -1410,21 +1463,30 @@ async function loadApprovalPanel(order) {
 
   // Panel logic
   if (status === 'vystavena' && isCreator) {
-    // Fill L1 approvers dropdown
+    const approversL1 = getApprovers(1);
     const sel = el('ap-approver-l1'); sel.innerHTML='<option value="">— vyberte —</option>';
-    getApprovers(1).forEach(p=>{ sel.innerHTML+=`<option value="${p.id}">${esc(p.full_name)}</option>`; });
+    approversL1.forEach(p=>{ sel.innerHTML+=`<option value="${p.id}">${esc(p.full_name)}</option>`; });
     el('ap-submit-l1').classList.remove('hidden');
+    if (approversL1.length === 0) {
+      el('ap-submit-l1').insertAdjacentHTML('beforeend',
+        '<p style="color:#c0392b;font-size:12px;margin-top:8px;">⚠ Žiadny používateľ nemá nastavenú rolu "Vedúci strediska" (approval_level=1). Požiadajte administrátora, aby v Správe používateľov nastavil aspoň jednému schvaľovateľovi rolu 1. úrovne.</p>');
+    }
   } else if (status === 'caka_L1' && isPendingApprover) {
     el('ap-approve-l1').classList.remove('hidden');
-    el('ap-reject-note-wrap').classList.add('hidden');
+  } else if (status === 'caka_L1' && !isPendingApprover) {
+    el('approval-panel').insertAdjacentHTML('beforeend',
+      `<p id="ap-info-msg" style="font-size:12px;color:var(--muted);">Objednávka čaká na schválenie inej osoby (1. úroveň).</p>`);
   } else if (status === 'schvalena_L1' && myLevel >= 1) {
-    // L1 approver can send to L2
+    const approversL2 = getApprovers(2);
     const sel = el('ap-approver-l2'); sel.innerHTML='<option value="">— vyberte —</option>';
-    getApprovers(2).forEach(p=>{ sel.innerHTML+=`<option value="${p.id}">${esc(p.full_name)}</option>`; });
+    approversL2.forEach(p=>{ sel.innerHTML+=`<option value="${p.id}">${esc(p.full_name)}</option>`; });
     el('ap-submit-l2').classList.remove('hidden');
+    if (approversL2.length === 0) {
+      el('ap-submit-l2').insertAdjacentHTML('beforeend',
+        '<p style="color:#c0392b;font-size:12px;margin-top:8px;">⚠ Žiadny používateľ nemá nastavenú rolu "Riaditeľ" (approval_level=2). Požiadajte administrátora o nastavenie.</p>');
+    }
   } else if (status === 'caka_L2' && isPendingApprover) {
     el('ap-approve-l2').classList.remove('hidden');
-    el('ap-reject-l2-note-wrap').classList.add('hidden');
   } else if (status === 'zamietnuta' && isCreator) {
     el('ap-rejected-info').classList.remove('hidden');
     el('ap-rejected-note-text').textContent = 'Zamietnuté: ' + (order.rejection_note||'bez komentára');
@@ -1432,9 +1494,14 @@ async function loadApprovalPanel(order) {
 }
 
 async function sendNotification(type, toEmail, toName, orderNumber, senderName, note) {
+  if (!toEmail) {
+    console.warn('sendNotification: chýba toEmail - schvaľovateľ/vystavovateľ nemá v profile vyplnený email.');
+    alert('Upozornenie: email sa neodoslal, pretože príjemca nemá v systéme vyplnenú emailovú adresu (pole "email" v profile). Skontrolujte to v Správe používateľov.');
+    return;
+  }
   try {
     const {data:{session}} = await supabaseClient.auth.getSession();
-    await fetch(EDGE_FUNCTION_URL, {
+    const res = await fetch(EDGE_FUNCTION_URL, {
       method:'POST',
       headers:{
         'Content-Type':'application/json',
@@ -1442,7 +1509,15 @@ async function sendNotification(type, toEmail, toName, orderNumber, senderName, 
       },
       body: JSON.stringify({type, to_email:toEmail, to_name:toName, order_number:orderNumber, sender_name:senderName, note})
     });
-  } catch(e) { console.warn('Email notification failed:', e); }
+    const result = await res.json().catch(()=>({}));
+    if (!res.ok || result.ok === false) {
+      console.error('Email notification failed:', result);
+      alert('Email sa nepodarilo odoslať: ' + (result.error || res.status) + '\n\nObjednávka bola napriek tomu úspešne uložená - len notifikácia neprišla. Skontrolujte nastavenie SMTP v Supabase Edge Function Secrets.');
+    }
+  } catch(e) {
+    console.error('Email notification failed:', e);
+    alert('Email sa nepodarilo odoslať (chyba siete alebo funkcie): ' + e.message + '\n\nObjednávka bola napriek tomu úspešne uložená.');
+  }
 }
 
 // Submit L1
@@ -1485,6 +1560,7 @@ el('ap-approve-l1-btn').addEventListener('click', async () => {
 // Reject L1
 el('ap-reject-l1-btn').addEventListener('click', () => {
   el('ap-reject-note-wrap').classList.toggle('hidden');
+  el('ap-return-note-wrap').classList.add('hidden');
 });
 el('ap-reject-confirm-btn').addEventListener('click', async () => {
   const note = el('ap-reject-note').value.trim();
@@ -1502,6 +1578,30 @@ el('ap-reject-confirm-btn').addEventListener('click', async () => {
   renderSidebar(el('sidebar-search').value);
   renderStatusBadge('zamietnuta');
   await loadApprovalPanel(S.viewOrder);
+});
+
+// Vrátiť na opravu L1
+el('ap-return-l1-btn').addEventListener('click', () => {
+  el('ap-return-note-wrap').classList.toggle('hidden');
+  el('ap-reject-note-wrap').classList.add('hidden');
+});
+el('ap-return-confirm-btn').addEventListener('click', async () => {
+  const note = el('ap-return-note').value.trim();
+  if (!note) { alert('Uveďte dôvod vrátenia.'); return; }
+  el('ap-return-confirm-btn').disabled = true;
+  const {data, error} = await supabaseClient.rpc('return_order', {
+    p_order_id: S.viewOrder.id, p_note: note
+  });
+  el('ap-return-confirm-btn').disabled = false;
+  if (error) { alert('Chyba: '+error.message); return; }
+  await sendNotification('rejected', data.creator_email, data.creator_name,
+    data.order_number, data.approver_name, 'Vrátené na opravu: '+note);
+  S.viewOrder.status = 'vystavena'; S.viewOrder.rejection_note = note; S.viewOrder.pending_approver_id = null;
+  S.orders = S.orders.map(o=>o.id===S.viewOrder.id?{...o,status:'vystavena',rejection_note:note,pending_approver_id:null}:o);
+  renderSidebar(el('sidebar-search').value);
+  renderStatusBadge('vystavena');
+  await loadApprovalPanel(S.viewOrder);
+  alert('Objednávka bola vrátená vystavovateľovi na opravu.');
 });
 
 // Submit L2
@@ -1545,6 +1645,7 @@ el('ap-approve-l2-btn').addEventListener('click', async () => {
 // Reject L2
 el('ap-reject-l2-btn').addEventListener('click', () => {
   el('ap-reject-l2-note-wrap').classList.toggle('hidden');
+  el('ap-return-l2-note-wrap').classList.add('hidden');
 });
 el('ap-reject-l2-confirm-btn').addEventListener('click', async () => {
   const note = el('ap-reject-l2-note').value.trim();
@@ -1562,6 +1663,30 @@ el('ap-reject-l2-confirm-btn').addEventListener('click', async () => {
   renderSidebar(el('sidebar-search').value);
   renderStatusBadge('zamietnuta');
   await loadApprovalPanel(S.viewOrder);
+});
+
+// Vrátiť na opravu L2
+el('ap-return-l2-btn').addEventListener('click', () => {
+  el('ap-return-l2-note-wrap').classList.toggle('hidden');
+  el('ap-reject-l2-note-wrap').classList.add('hidden');
+});
+el('ap-return-l2-confirm-btn').addEventListener('click', async () => {
+  const note = el('ap-return-l2-note').value.trim();
+  if (!note) { alert('Uveďte dôvod vrátenia.'); return; }
+  el('ap-return-l2-confirm-btn').disabled = true;
+  const {data, error} = await supabaseClient.rpc('return_order', {
+    p_order_id: S.viewOrder.id, p_note: note
+  });
+  el('ap-return-l2-confirm-btn').disabled = false;
+  if (error) { alert('Chyba: '+error.message); return; }
+  await sendNotification('rejected', data.creator_email, data.creator_name,
+    data.order_number, data.approver_name, 'Vrátené na opravu: '+note);
+  S.viewOrder.status = 'vystavena'; S.viewOrder.rejection_note = note; S.viewOrder.pending_approver_id = null;
+  S.orders = S.orders.map(o=>o.id===S.viewOrder.id?{...o,status:'vystavena',rejection_note:note,pending_approver_id:null}:o);
+  renderSidebar(el('sidebar-search').value);
+  renderStatusBadge('vystavena');
+  await loadApprovalPanel(S.viewOrder);
+  alert('Objednávka bola vrátená vystavovateľovi na opravu.');
 });
 
 // Resubmit after rejection
