@@ -118,7 +118,8 @@ td.total-cell{text-align:right;font-weight:600;white-space:nowrap;}
 
     <aside class="sidebar">
       <div class="sidebar-header">
-        <button class="new-order-btn" id="dashboard-btn" style="background:#1f5fa8;margin:0 0 8px;">🏠 Prehľad</button>
+        <button class="new-order-btn" id="dashboard-btn" style="background:#1f5fa8;margin:0 0 6px;">🏠 Prehľad</button>
+        <button class="new-order-btn" id="reports-btn" style="background:#6b7785;margin:0 0 8px;">📊 Štatistiky / Vyhľadávanie</button>
         <h3>Vystavené objednávky</h3>
         <input class="sidebar-search" id="sidebar-search" placeholder="Číslo / dodávateľ / zákazka..." type="search"/>
       </div>
@@ -164,6 +165,12 @@ td.total-cell{text-align:right;font-weight:600;white-space:nowrap;}
           <div id="dash-draft-list"></div>
         </div>
 
+        <!-- Mnou postúpené ďalej -->
+        <div id="dash-section-postupene" class="hidden" style="margin-bottom:24px;">
+          <h3 style="margin-bottom:10px;">📤 Mnou postúpené ďalej (sledujem priebeh)</h3>
+          <div id="dash-postupene-list"></div>
+        </div>
+
         <!-- V procese schvaľovania -->
         <div id="dash-section-pending" class="hidden" style="margin-bottom:24px;">
           <h3 style="margin-bottom:10px;">⏳ Moje objednávky v procese schvaľovania</h3>
@@ -175,6 +182,78 @@ td.total-cell{text-align:right;font-weight:600;white-space:nowrap;}
           <h3 style="margin-bottom:10px;">✓ Naposledy schválené (pripravené na stiahnutie)</h3>
           <div id="dash-approved-list"></div>
         </div>
+      </section>
+
+      <!-- REPORTY / ŠTATISTIKY -->
+      <section class="card hidden" id="reports-view">
+        <h2 style="margin-bottom:14px;">📊 Štatistiky a vyhľadávanie objednávok</h2>
+
+        <div class="form-grid" style="margin-bottom:14px;">
+          <div>
+            <label>Voľný text (číslo, dodávateľ, zákazka, popis položky)</label>
+            <input id="rf-text" placeholder="napr. kábel, SOFIASTAV, 500821..."/>
+          </div>
+          <div>
+            <label>Vystaviteľ</label>
+            <select id="rf-creator"><option value="">— všetci —</option></select>
+          </div>
+          <div>
+            <label>Stredisko</label>
+            <select id="rf-stredisko" multiple size="3"></select>
+          </div>
+          <div>
+            <label>Firma</label>
+            <select id="rf-company"><option value="">— všetky —</option></select>
+          </div>
+          <div>
+            <label>Typ objednávky</label>
+            <select id="rf-template"><option value="">— všetky —</option></select>
+          </div>
+          <div>
+            <label>Stav</label>
+            <select id="rf-status">
+              <option value="">— všetky —</option>
+              <option value="vystavena">Vystavená</option>
+              <option value="caka_L1">Čaká na schválenie L1</option>
+              <option value="schvalena_L1">Schválená L1</option>
+              <option value="caka_L2">Čaká na schválenie L2</option>
+              <option value="schvalena">Plne schválená</option>
+              <option value="zamietnuta">Zamietnutá</option>
+            </select>
+          </div>
+          <div>
+            <label>Zákazka</label>
+            <select id="rf-zakazka"><option value="">— všetky —</option></select>
+          </div>
+          <div>
+            <label>Dátum vystavenia od</label>
+            <input type="date" id="rf-date-from"/>
+          </div>
+          <div>
+            <label>Dátum vystavenia do</label>
+            <input type="date" id="rf-date-to"/>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;padding-top:22px;">
+            <input type="checkbox" id="rf-only-mine" style="width:auto;"/>
+            <label for="rf-only-mine" style="margin:0;font-weight:400;color:var(--text);">Len moje objednávky</label>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-bottom:16px;">
+          <button id="rf-apply-btn">🔍 Vyhľadať</button>
+          <button class="secondary" id="rf-reset-btn">Vyčistiť filtre</button>
+          <button class="secondary" id="rf-export-btn">⬇ Export do Excelu (zoznam)</button>
+        </div>
+
+        <div id="rf-summary" style="background:#f0f3f7;border-radius:var(--radius);padding:10px 14px;margin-bottom:14px;font-size:13px;"></div>
+
+        <table class="items" id="rf-results-table">
+          <thead><tr>
+            <th>Číslo</th><th>Dátum</th><th>Firma</th><th>Stredisko</th><th>Dodávateľ</th>
+            <th>Zákazka</th><th>Typ</th><th>Vystavil</th><th>Stav</th><th style="text-align:right">Suma</th>
+          </tr></thead>
+          <tbody id="rf-results-body"></tbody>
+        </table>
       </section>
 
       <!-- DETAIL -->
@@ -273,6 +352,16 @@ td.total-cell{text-align:right;font-weight:600;white-space:nowrap;}
 
           <!-- História schválení -->
           <div id="ap-history" style="margin-top:14px;"></div>
+        </div>
+
+        <!-- KOMUNIKÁCIA / CHAT K OBJEDNÁVKE -->
+        <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:16px;">
+          <h3 style="margin-bottom:10px;">💬 Komunikácia k objednávke</h3>
+          <div id="chat-messages" style="max-height:280px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;margin-bottom:10px;"></div>
+          <div style="display:flex;gap:8px;">
+            <input id="chat-input" placeholder="Napíšte správu..." style="flex:1;"/>
+            <button id="chat-send-btn">Odoslať</button>
+          </div>
         </div>
       </section>
 
@@ -611,12 +700,21 @@ async function renderDashboard() {
   const {data: freshOrders} = await supabaseClient.from('orders').select('*').order('sequence_number',{ascending:false});
   S.orders = freshOrders || [];
 
-  const myOrders       = S.orders.filter(o => o.created_by === myId);
-  const waitingForMe   = S.orders.filter(o => o.pending_approver_id === myId && (o.status==='caka_L1'||o.status==='caka_L2'));
-  const returnedToMe   = myOrders.filter(o => o.status === 'vystavena' && o.rejection_note);
-  const draftMine      = myOrders.filter(o => o.status === 'vystavena' && !o.rejection_note);
-  const pendingMine    = myOrders.filter(o => ['caka_L1','schvalena_L1','caka_L2'].includes(o.status));
-  const approvedRecent = myOrders.filter(o => o.status === 'schvalena')
+  // Moje schválenia (na zistenie, ktoré objednávky som JA postúpil ďalej)
+  const {data: myApprovals} = await supabaseClient.from('approvals')
+    .select('*').eq('approver_id', myId).eq('action','schvalene');
+  S.myApprovals = myApprovals || [];
+  const myApprovedOrderIds = new Set(S.myApprovals.map(a=>a.order_id));
+
+  const myOrders        = S.orders.filter(o => o.created_by === myId);
+  const waitingForMe    = S.orders.filter(o => o.pending_approver_id === myId && (o.status==='caka_L1'||o.status==='caka_L2'));
+  const returnedToMe    = myOrders.filter(o => o.status === 'vystavena' && o.rejection_note);
+  const draftMine       = myOrders.filter(o => o.status === 'vystavena' && !o.rejection_note);
+  const pendingMine     = myOrders.filter(o => ['caka_L1','schvalena_L1','caka_L2'].includes(o.status));
+  // Objednávky, ktoré NIE sú moje, ale ktoré som JA schválil a postúpil ďalej (alebo už sú plne schválené) - sledujem ich osud
+  const postupeneMnou   = S.orders.filter(o => o.created_by !== myId && myApprovedOrderIds.has(o.id)
+                              && ['caka_L2','schvalena_L1','schvalena'].includes(o.status));
+  const approvedRecent  = myOrders.filter(o => o.status === 'schvalena')
                                   .sort((a,b)=> new Date(b.updated_at||b.order_date) - new Date(a.updated_at||a.order_date))
                                   .slice(0,5);
 
@@ -626,18 +724,23 @@ async function renderDashboard() {
   const monthTotal = monthOrders.reduce((s,o)=>s+(Number(o.total_amount)||0),0);
 
   const stats = [
-    {label:'Čaká na moje schválenie', value:waitingForMe.length, color:'#e67e22'},
-    {label:'Vrátené mi na opravu', value:returnedToMe.length, color:'#c0392b'},
-    {label:'Moje rozpracované', value:draftMine.length, color:'#6b7785'},
-    {label:'V procese schvaľovania', value:pendingMine.length, color:'#2980b9'},
-    {label:'Objednávky tento mesiac', value:monthOrders.length, color:'#1f5fa8'},
-    {label:'Suma tento mesiac', value:fmt(monthTotal), color:'#1e7e34'},
+    {label:'Čaká na moje schválenie', value:waitingForMe.length, color:'#e67e22', filter:{pendingApproverId:myId}},
+    {label:'Vrátené mi na opravu', value:returnedToMe.length, color:'#c0392b', filter:{createdBy:myId, status:'vystavena', onlyReturned:true}},
+    {label:'Moje rozpracované', value:draftMine.length, color:'#6b7785', filter:{createdBy:myId, status:'vystavena', onlyDraft:true}},
+    {label:'V procese schvaľovania', value:pendingMine.length, color:'#2980b9', filter:{createdBy:myId, statusIn:['caka_L1','schvalena_L1','caka_L2']}},
+    {label:'Mnou postúpené ďalej', value:postupeneMnou.length, color:'#8e44ad', filter:{ids:postupeneMnou.map(o=>o.id)}},
+    {label:'Objednávky tento mesiac', value:monthOrders.length, color:'#1f5fa8', filter:{month:thisMonth}},
+    {label:'Suma tento mesiac', value:fmt(monthTotal), color:'#1e7e34', filter:{month:thisMonth}},
+    {label:'Všetky objednávky', value:S.orders.length, color:'#1c2733', filter:{}},
   ];
-  el('dash-stats').innerHTML = stats.map(s=>`
-    <div style="background:#fff;border:1px solid var(--border);border-left:4px solid ${s.color};border-radius:var(--radius);padding:12px 14px;">
+  el('dash-stats').innerHTML = stats.map((s,i)=>`
+    <div style="background:#fff;border:1px solid var(--border);border-left:4px solid ${s.color};border-radius:var(--radius);padding:12px 14px;cursor:pointer;transition:box-shadow .15s;"
+         onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,0.1)'" onmouseout="this.style.boxShadow='none'"
+         onclick="window.__openStatFilter(${i})">
       <div style="font-size:22px;font-weight:700;color:${s.color};">${s.value}</div>
       <div style="font-size:12px;color:var(--muted);margin-top:2px;">${s.label}</div>
     </div>`).join('');
+  S.dashStatFilters = stats.map(s=>s.filter);
 
   // Čaká na moje schválenie
   if (waitingForMe.length > 0) {
@@ -681,6 +784,17 @@ async function renderDashboard() {
     el('dash-section-pending').classList.add('hidden');
   }
 
+  // Mnou postúpené ďalej (objednávky cudzie, ktoré som schválil a poslal ďalej)
+  if (postupeneMnou.length > 0) {
+    el('dash-section-postupene').classList.remove('hidden');
+    el('dash-postupene-list').innerHTML = postupeneMnou.map(o=>{
+      const label = STATUS_LABELS[o.status] || o.status;
+      return orderRowHtml(o, label);
+    }).join('');
+  } else {
+    el('dash-section-postupene').classList.add('hidden');
+  }
+
   // Naposledy schválené
   if (approvedRecent.length > 0) {
     el('dash-section-approved').classList.remove('hidden');
@@ -690,7 +804,7 @@ async function renderDashboard() {
   }
 
   // Ak nič z vyššie uvedeného nie je vidno, ukáž uvítaciu správu
-  const anySectionVisible = waitingForMe.length||returnedToMe.length||draftMine.length||pendingMine.length||approvedRecent.length;
+  const anySectionVisible = waitingForMe.length||returnedToMe.length||draftMine.length||pendingMine.length||postupeneMnou.length||approvedRecent.length;
   if (!anySectionVisible) {
     el('dash-stats').insertAdjacentHTML('afterend',
       '<p id="dash-empty-msg" style="color:var(--muted);margin-top:10px;">Žiadne aktuálne úlohy. Môžete vystaviť novú objednávku tlačidlom vľavo dole.</p>');
@@ -698,6 +812,11 @@ async function renderDashboard() {
     document.getElementById('dash-empty-msg')?.remove();
   }
 }
+
+window.__openStatFilter = function(i) {
+  const f = S.dashStatFilters[i];
+  openReportsWithFilter(f);
+};
 
 el('new-order-btn').addEventListener('click', () => {
   S.viewOrder = null; S.cloneData = null;
@@ -714,7 +833,7 @@ el('new-order-btn').addEventListener('click', () => {
 async function openOrder(order) {
   S.viewOrder = order;
   renderSidebar(el('sidebar-search').value);
-  ['step-company','step-template','step-form','step-result','dashboard-view','admin-panel'].forEach(id=>el(id).classList.add('hidden'));
+  ['step-company','step-template','step-form','step-result','dashboard-view','admin-panel','reports-view'].forEach(id=>el(id).classList.add('hidden'));
   el('view-order').classList.remove('hidden');
   el('view-title').textContent = 'Objednávka č. ' + order.order_number;
 
@@ -758,7 +877,56 @@ async function openOrder(order) {
   S.lastOrder = order; S.lastItems = S.viewItems;
   renderStatusBadge(order.status||'vystavena');
   await loadApprovalPanel(order);
+  await loadChat(order.id);
 }
+
+// ── CHAT / KOMENTÁRE K OBJEDNÁVKE ───────────────────────────────────────────
+async function loadChat(orderId) {
+  const {data, error} = await supabaseClient.from('order_comments')
+    .select('*').eq('order_id', orderId).order('created_at');
+  const wrap = el('chat-messages');
+  if (error) {
+    wrap.innerHTML = '<p style="color:var(--muted);font-size:12px;">Komentáre sa nepodarilo načítať (skontrolujte, či je spustený skript 09_comments_and_fixes.sql).</p>';
+    return;
+  }
+  const comments = data || [];
+  if (!comments.length) {
+    wrap.innerHTML = '<p style="color:var(--muted);font-size:12px;">Zatiaľ žiadne správy.</p>';
+    return;
+  }
+  if (!S.profiles) {
+    const {data:profs} = await supabaseClient.from('profiles').select('*');
+    S.profiles = profs||[];
+  }
+  wrap.innerHTML = comments.map(c => {
+    const author = S.profiles.find(p=>p.id===c.author_id);
+    const isMe = c.author_id === S.profile.id;
+    const bg = c.is_system ? '#fff3cd' : (isMe ? '#e0ebff' : '#f0f3f7');
+    const border = c.is_system ? '#ffc107' : (isMe ? '#1f5fa8' : 'var(--border)');
+    return `<div style="background:${bg};border:1px solid ${border};border-radius:8px;padding:8px 12px;align-self:${isMe?'flex-end':'flex-start'};max-width:80%;">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:3px;font-weight:600;">${esc(author?.full_name||'?')} · ${fmtD(c.created_at?.slice(0,10))} ${c.created_at?.slice(11,16)||''}</div>
+      <div style="font-size:13px;white-space:pre-wrap;">${esc(c.message)}</div>
+    </div>`;
+  }).join('');
+  wrap.scrollTop = wrap.scrollHeight;
+}
+
+el('chat-send-btn').addEventListener('click', async () => {
+  const msg = el('chat-input').value.trim();
+  if (!msg || !S.viewOrder) return;
+  el('chat-send-btn').disabled = true;
+  const {error} = await supabaseClient.from('order_comments').insert({
+    order_id: S.viewOrder.id, author_id: S.profile.id, message: msg, is_system: false
+  });
+  el('chat-send-btn').disabled = false;
+  if (error) { alert('Správu sa nepodarilo odoslať: ' + error.message); return; }
+  el('chat-input').value = '';
+  await loadChat(S.viewOrder.id);
+});
+
+el('chat-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); el('chat-send-btn').click(); }
+});
 
 el('view-excel-btn').addEventListener('click', () => exportExcel(S.viewOrder, S.viewItems));
 el('view-print-btn').addEventListener('click', () => printOrder(S.viewOrder, S.viewItems));
@@ -806,7 +974,7 @@ function cloneOrder(order, items) {
 
 // ── STEPS ───────────────────────────────────────────────────────────────
 function showStep(id) {
-  ['view-order','step-company','step-template','step-form','step-result','admin-panel','dashboard-view'].forEach(s=>el(s).classList.add('hidden'));
+  ['view-order','step-company','step-template','step-form','step-result','admin-panel','dashboard-view','reports-view'].forEach(s=>el(s).classList.add('hidden'));
   el(id).classList.remove('hidden');
 }
 
@@ -1886,7 +2054,7 @@ function initAdminPanel() {
 }
 
 el('admin-btn').addEventListener('click', async () => {
-  ['view-order','step-company','step-template','step-form','step-result','dashboard-view'].forEach(id=>el(id).classList.add('hidden'));
+  ['view-order','step-company','step-template','step-form','step-result','dashboard-view','reports-view'].forEach(id=>el(id).classList.add('hidden'));
   el('admin-panel').classList.remove('hidden');
   el('admin-form-wrap').classList.add('hidden');
   el('admin-error').classList.add('hidden');
@@ -2055,6 +2223,198 @@ el('af-save-btn').addEventListener('click', async () => {
   await loadAdminUserList();
   // Obnov zoznam profilov pre schvaľovanie
   S.profiles = null;
+});
+
+// ── REPORTY / ŠTATISTIKY ──────────────────────────────────────────────────
+el('reports-btn').addEventListener('click', async () => {
+  showStep('reports-view');
+  await initReportsFilters();
+  applyReportFilters();
+});
+
+async function initReportsFilters() {
+  if (S.reportsInitialized) return;
+  S.reportsInitialized = true;
+
+  if (!S.profiles) {
+    const {data} = await supabaseClient.from('profiles').select('*');
+    S.profiles = data||[];
+  }
+
+  // Vystaviteľ
+  const creatorSel = el('rf-creator');
+  [...S.profiles].sort((a,b)=>a.full_name.localeCompare(b.full_name)).forEach(p=>{
+    creatorSel.innerHTML += `<option value="${p.id}">${esc(p.full_name)}</option>`;
+  });
+
+  // Stredisko (unikátne hodnoty z profiles)
+  const stredisks = [...new Set(S.profiles.map(p=>p.stredisko).filter(Boolean))].sort();
+  const stredSel = el('rf-stredisko');
+  stredisks.forEach(s=>{ stredSel.innerHTML += `<option value="${esc(s)}">${esc(s)}</option>`; });
+
+  // Firma
+  const compSel = el('rf-company');
+  S.companies.forEach(c=>{ compSel.innerHTML += `<option value="${c.code}">${esc(c.name)}</option>`; });
+
+  // Typ objednávky
+  const tplSel = el('rf-template');
+  S.templates.forEach(t=>{ tplSel.innerHTML += `<option value="${t.code}">${esc(t.name)}</option>`; });
+
+  // Zákazka (zo všetkých zákaziek, aj neaktívnych - pre historické objednávky)
+  const {data: allZakazky} = await supabaseClient.from('zakazky').select('*').order('cislo');
+  const zakSel = el('rf-zakazka');
+  (allZakazky||[]).forEach(z=>{ zakSel.innerHTML += `<option value="${esc(z.cislo)}">${esc(z.cislo)} - ${esc(z.nazov)}</option>`; });
+}
+
+function openReportsWithFilter(filter) {
+  showStep('reports-view');
+  initReportsFilters().then(() => {
+    // Vyčisti všetky polia najprv
+    resetReportFilters(false);
+    if (filter.pendingApproverId) {
+      // Špeciálny prípad - "čaká na moje schválenie" nemá priamy filter prvok,
+      // simulujeme cez priamy zoznam ID
+      el('rf-status').value = ''; // necháme prázdne, filtrujeme nižšie cez customIds
+    }
+    if (filter.createdBy) el('rf-only-mine').checked = true;
+    if (filter.status) el('rf-status').value = filter.status;
+    if (filter.statusIn) S.reportStatusIn = filter.statusIn;
+    if (filter.month) { el('rf-date-from').value = filter.month+'-01'; el('rf-date-to').value = filter.month+'-31'; }
+    if (filter.ids) S.reportCustomIds = filter.ids;
+    if (filter.pendingApproverId) S.reportPendingApprover = filter.pendingApproverId;
+    if (filter.onlyReturned) S.reportOnlyReturned = true;
+    if (filter.onlyDraft) S.reportOnlyDraft = true;
+    applyReportFilters();
+  });
+}
+
+function resetReportFilters(apply) {
+  el('rf-text').value = '';
+  el('rf-creator').value = '';
+  [...el('rf-stredisko').options].forEach(o=>o.selected=false);
+  el('rf-company').value = '';
+  el('rf-template').value = '';
+  el('rf-status').value = '';
+  el('rf-zakazka').value = '';
+  el('rf-date-from').value = '';
+  el('rf-date-to').value = '';
+  el('rf-only-mine').checked = false;
+  S.reportStatusIn = null;
+  S.reportCustomIds = null;
+  S.reportPendingApprover = null;
+  S.reportOnlyReturned = false;
+  S.reportOnlyDraft = false;
+  if (apply !== false) applyReportFilters();
+}
+
+el('rf-reset-btn').addEventListener('click', () => resetReportFilters(true));
+el('rf-apply-btn').addEventListener('click', () => {
+  // Manuálne vyhľadávanie cez tlačidlo ruší prípadné špeciálne filtre z dashboardu
+  S.reportStatusIn = null; S.reportCustomIds = null; S.reportPendingApprover = null;
+  S.reportOnlyReturned = false; S.reportOnlyDraft = false;
+  applyReportFilters();
+});
+
+function applyReportFilters() {
+  const text = el('rf-text').value.trim().toLowerCase();
+  const creator = el('rf-creator').value;
+  const strediska = [...el('rf-stredisko').selectedOptions].map(o=>o.value);
+  const company = el('rf-company').value;
+  const template = el('rf-template').value;
+  const status = el('rf-status').value;
+  const zakazka = el('rf-zakazka').value;
+  const dateFrom = el('rf-date-from').value;
+  const dateTo = el('rf-date-to').value;
+  const onlyMine = el('rf-only-mine').checked;
+
+  let results = S.orders.filter(o => {
+    if (S.reportCustomIds) return S.reportCustomIds.includes(o.id);
+    if (S.reportPendingApprover) return o.pending_approver_id === S.reportPendingApprover && ['caka_L1','caka_L2'].includes(o.status);
+    if (S.reportOnlyReturned) return o.created_by===S.profile.id && o.status==='vystavena' && o.rejection_note;
+    if (S.reportOnlyDraft) return o.created_by===S.profile.id && o.status==='vystavena' && !o.rejection_note;
+    if (S.reportStatusIn) {
+      if (!(o.created_by===S.profile.id && S.reportStatusIn.includes(o.status))) return false;
+    }
+    if (onlyMine && o.created_by !== S.profile.id) return false;
+    if (creator && o.created_by !== creator) return false;
+    if (strediska.length && !strediska.includes(o.stredisko)) return false;
+    if (company && o.company_code !== company) return false;
+    if (template && o.template_code !== template) return false;
+    if (status && o.status !== status) return false;
+    if (zakazka && o.zakazka_cislo !== zakazka) return false;
+    if (dateFrom && o.order_date < dateFrom) return false;
+    if (dateTo && o.order_date > dateTo) return false;
+    if (text) {
+      const hay = [o.order_number, o.supplier_snapshot?.name, o.zakazka_cislo, o.intro_text, o.note]
+        .filter(Boolean).join(' ').toLowerCase();
+      if (!hay.includes(text)) return false;
+    }
+    return true;
+  });
+
+  S.reportResults = results;
+
+  // Súhrn
+  const total = results.reduce((s,o)=>s+(Number(o.total_amount)||0),0);
+  el('rf-summary').innerHTML = `Nájdených <strong>${results.length}</strong> objednávok &nbsp;|&nbsp; Celková suma: <strong>${fmt(total)}</strong>`;
+
+  // Tabuľka
+  const profById = id => (S.profiles||[]).find(p=>p.id===id);
+  el('rf-results-body').innerHTML = results.map(o => {
+    const creatorP = profById(o.created_by);
+    const tpl = S.templates.find(t=>t.code===o.template_code);
+    const comp = S.companies.find(c=>c.code===o.company_code);
+    return `<tr style="cursor:pointer;" onclick="window.__openOrderById('${o.id}')">
+      <td style="font-weight:600;color:var(--primary);">${esc(o.order_number)}</td>
+      <td>${fmtD(o.order_date)}</td>
+      <td>${esc(comp?.code||o.company_code)}</td>
+      <td>${esc(o.stredisko||'')}</td>
+      <td>${esc(o.supplier_snapshot?.name||'')}</td>
+      <td>${esc(o.zakazka_cislo||'')}</td>
+      <td>${esc(tpl?.name||o.template_code)}</td>
+      <td>${esc(creatorP?.full_name||'')}</td>
+      <td><span style="font-size:11px;padding:2px 7px;border-radius:10px;background:${(STATUS_COLORS[o.status]||'#888')}22;color:${STATUS_COLORS[o.status]||'#888'};">${STATUS_LABELS[o.status]||o.status}</span></td>
+      <td style="text-align:right;">${o.total_amount?fmt(o.total_amount):'—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+el('rf-export-btn').addEventListener('click', () => {
+  const results = S.reportResults || [];
+  if (!results.length) { alert('Žiadne výsledky na export.'); return; }
+  const profById = id => (S.profiles||[]).find(p=>p.id===id);
+
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('Objednávky');
+  ws.columns = [
+    {header:'Číslo', key:'num', width:18},
+    {header:'Dátum', key:'date', width:12},
+    {header:'Firma', key:'comp', width:8},
+    {header:'Stredisko', key:'str', width:10},
+    {header:'Dodávateľ', key:'sup', width:28},
+    {header:'Zákazka', key:'zak', width:14},
+    {header:'Typ', key:'tpl', width:14},
+    {header:'Vystavil', key:'creator', width:20},
+    {header:'Stav', key:'status', width:18},
+    {header:'Suma', key:'total', width:12},
+  ];
+  ws.getRow(1).font = {bold:true};
+  results.forEach(o => {
+    const tpl = S.templates.find(t=>t.code===o.template_code);
+    ws.addRow({
+      num: o.order_number, date: o.order_date, comp: o.company_code, str: o.stredisko,
+      sup: o.supplier_snapshot?.name||'', zak: o.zakazka_cislo, tpl: tpl?.name||o.template_code,
+      creator: profById(o.created_by)?.full_name||'', status: STATUS_LABELS[o.status]||o.status,
+      total: Number(o.total_amount)||0
+    });
+  });
+  wb.xlsx.writeBuffer().then(buf=>{
+    const blob = new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'Objednavky_export_' + todayStr() + '.xlsx';
+    a.click();
+  });
 });
 
 checkSession();
