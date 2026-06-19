@@ -28,9 +28,9 @@ header.topbar .user-info{font-size:13px;display:flex;align-items:center;gap:10px
 .order-item{padding:9px 12px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s;}
 .order-item:hover{background:#f0f5ff;}
 .order-item.active{background:#e0ebff;border-left:3px solid var(--primary);}
-.order-item.approved{background:#e9f7ee;}
-.order-item.approved:hover{background:#dcf0e3;}
-.order-item.approved.active{background:#cdeeda;border-left:3px solid #1e7e34;}
+.order-item.approved{background:#c8ecd4;}
+.order-item.approved:hover{background:#b3e3c3;}
+.order-item.approved.active{background:#9fdab3;border-left:3px solid #1e7e34;}
 .order-item .oi-num{font-weight:700;font-size:13px;color:var(--primary);}
 .order-item .oi-sup{font-size:12px;color:var(--text);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .order-item .oi-date{font-size:11px;color:var(--muted);margin-top:1px;}
@@ -684,7 +684,8 @@ function renderSidebar(q) {
     d.className = 'order-item' + (S.viewOrder?.id===o.id ? ' active' : '') + (isApproved ? ' approved' : '');
     d.innerHTML = `<div class="oi-num">${esc(o.order_number)}</div>
       <div class="oi-sup">${esc(o.supplier_snapshot?.name||'—')}</div>
-      <div class="oi-date">${fmtD(o.order_date)}${o.total_amount?' · '+fmt(o.total_amount):''}</div>`;
+      <div class="oi-date">${fmtD(o.order_date)}${o.total_amount?' · '+fmt(o.total_amount):''}</div>
+      ${isApproved ? '<div style="font-size:11px;font-weight:700;color:#1e7e34;margin-top:2px;">✓ Schválená</div>' : ''}`;
     d.addEventListener('click', () => openOrder(o));
     list.appendChild(d);
   });
