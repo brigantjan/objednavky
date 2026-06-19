@@ -125,6 +125,7 @@ td.total-cell{text-align:right;font-weight:600;white-space:nowrap;}
         <div style="padding:20px;text-align:center;color:var(--muted);font-size:13px;">Načítavam...</div>
       </div>
       <button class="new-order-btn" id="new-order-btn">+ Nová objednávka</button>
+      <button class="new-order-btn" id="admin-btn" style="background:#444;display:none;">⚙ Správa používateľov</button>
     </aside>
 
     <div class="main-content" id="main-content">
@@ -133,15 +134,88 @@ td.total-cell{text-align:right;font-weight:600;white-space:nowrap;}
       <!-- DETAIL -->
       <section class="card hidden" id="view-order">
         <div class="order-detail-header">
-          <h2 id="view-title"></h2>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <div>
+            <h2 id="view-title"></h2>
+            <span id="view-status-badge" style="font-size:12px;padding:3px 10px;border-radius:20px;font-weight:600;display:inline-block;margin-top:4px;"></span>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;" id="view-actions">
             <button class="secondary" id="view-excel-btn">⬇ Excel</button>
-            <button class="secondary" id="view-print-btn">🖨 Tlač</button>
+            <button class="secondary" id="view-print-btn">🖨 Tlač / PDF</button>
+            <button class="secondary" id="view-edit-btn">✏️ Editovať</button>
             <button id="view-clone-btn">📋 Použiť ako šablónu</button>
           </div>
         </div>
         <div class="detail-grid" id="view-grid"></div>
         <table class="items" id="view-items" style="margin-top:10px;"></table>
+
+        <!-- Schvaľovací panel -->
+        <div id="approval-panel" class="hidden" style="margin-top:16px;border-top:1px solid var(--border);padding-top:16px;">
+
+          <!-- Odoslanie na schválenie L1 (vystavovateľ) -->
+          <div id="ap-submit-l1" class="hidden">
+            <h3 style="margin-bottom:10px;">Odoslať na schválenie</h3>
+            <div class="form-grid" style="max-width:500px;">
+              <div class="full">
+                <label>Vedúci strediska (schvaľovateľ 1. úrovne) *</label>
+                <select id="ap-approver-l1">
+                  <option value="">— vyberte —</option>
+                </select>
+              </div>
+            </div>
+            <button id="ap-submit-l1-btn" style="margin-top:10px;">📤 Odoslať na schválenie</button>
+          </div>
+
+          <!-- Schválenie L1 (vedúci) -->
+          <div id="ap-approve-l1" class="hidden">
+            <h3 style="margin-bottom:10px;">Schválenie 1. úrovne (vedúci strediska)</h3>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;">
+              <button id="ap-approve-l1-btn" style="background:#1e7e34;border-color:#1e7e34;">✓ Schváliť</button>
+              <button class="danger" style="padding:8px 14px;font-size:13px;" id="ap-reject-l1-btn">✗ Zamietnuť</button>
+            </div>
+            <div id="ap-reject-note-wrap" class="hidden" style="margin-top:10px;max-width:500px;">
+              <label>Dôvod zamietnutia *</label>
+              <textarea id="ap-reject-note" rows="2" placeholder="Uveďte dôvod..."></textarea>
+              <button id="ap-reject-confirm-btn" style="margin-top:6px;background:#c0392b;border-color:#c0392b;">Potvrdiť zamietnutie</button>
+            </div>
+          </div>
+
+          <!-- Odoslanie na L2 (vedúci po schválení L1) -->
+          <div id="ap-submit-l2" class="hidden">
+            <h3 style="margin-bottom:10px;">Odoslať na schválenie riaditeľovi (2. úroveň)</h3>
+            <div class="form-grid" style="max-width:500px;">
+              <div class="full">
+                <label>Riaditeľ (schvaľovateľ 2. úrovne) *</label>
+                <select id="ap-approver-l2">
+                  <option value="">— vyberte —</option>
+                </select>
+              </div>
+            </div>
+            <button id="ap-submit-l2-btn" style="margin-top:10px;">📤 Odoslať riaditeľovi</button>
+          </div>
+
+          <!-- Schválenie L2 (riaditeľ) -->
+          <div id="ap-approve-l2" class="hidden">
+            <h3 style="margin-bottom:10px;">Schválenie 2. úrovne (riaditeľ)</h3>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button id="ap-approve-l2-btn" style="background:#1e7e34;border-color:#1e7e34;">✓ Schváliť</button>
+              <button class="danger" style="padding:8px 14px;font-size:13px;" id="ap-reject-l2-btn">✗ Zamietnuť</button>
+            </div>
+            <div id="ap-reject-l2-note-wrap" class="hidden" style="margin-top:10px;max-width:500px;">
+              <label>Dôvod zamietnutia *</label>
+              <textarea id="ap-reject-l2-note" rows="2" placeholder="Uveďte dôvod..."></textarea>
+              <button id="ap-reject-l2-confirm-btn" style="margin-top:6px;background:#c0392b;border-color:#c0392b;">Potvrdiť zamietnutie</button>
+            </div>
+          </div>
+
+          <!-- Info o zamietnutí -->
+          <div id="ap-rejected-info" class="hidden">
+            <div class="banner error" id="ap-rejected-note-text"></div>
+            <button id="ap-resubmit-btn" class="secondary" style="margin-top:6px;">Opraviť a znova odoslať</button>
+          </div>
+
+          <!-- História schválení -->
+          <div id="ap-history" style="margin-top:14px;"></div>
+        </div>
       </section>
 
       <!-- KROK 1 -->
@@ -158,7 +232,10 @@ td.total-cell{text-align:right;font-weight:600;white-space:nowrap;}
 
       <!-- KROK 3 -->
       <section class="card hidden" id="step-form">
-        <h2>3. Vyplňte objednávku</h2>
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+          <h2 id="form-title" style="margin:0;">3. Vyplňte objednávku</h2>
+          <span id="form-edit-badge" class="hidden" style="font-size:12px;background:#fff3cd;color:#856404;border:1px solid #ffc107;padding:3px 10px;border-radius:20px;font-weight:600;">Režim editácie</span>
+        </div>
         <div id="form-error" class="banner error hidden"></div>
         <form id="order-form">
           <div class="form-grid">
@@ -250,7 +327,10 @@ td.total-cell{text-align:right;font-weight:600;white-space:nowrap;}
 
           <div class="actions">
             <button type="button" class="secondary" id="back-btn">← Späť na typ</button>
-            <button type="submit" id="submit-btn">Vystaviť objednávku</button>
+            <div style="display:flex;gap:8px;">
+              <button type="button" class="secondary hidden" id="cancel-edit-btn">Zrušiť editáciu</button>
+              <button type="submit" id="submit-btn">Vystaviť objednávku</button>
+            </div>
           </div>
         </form>
       </section>
@@ -267,6 +347,57 @@ td.total-cell{text-align:right;font-weight:600;white-space:nowrap;}
     </div>
   </div>
 </div>
+
+<!-- ADMIN PANEL -->
+<section class="card hidden" id="admin-panel">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+    <h2 style="margin:0;">⚙ Správa používateľov</h2>
+    <button id="admin-add-btn">+ Nový používateľ</button>
+  </div>
+  <div id="admin-error" class="banner error hidden"></div>
+
+  <!-- Zoznam používateľov -->
+  <div id="admin-user-list" style="margin-bottom:20px;"></div>
+
+  <!-- Formulár nového / editovaného používateľa -->
+  <div id="admin-form-wrap" class="hidden" style="border:1px solid var(--border);border-radius:var(--radius);padding:16px;background:#fafbfc;">
+    <h3 id="admin-form-title" style="margin:0 0 12px;">Nový používateľ</h3>
+    <div class="form-grid">
+      <div><label>Meno a priezvisko *</label><input id="af-name"/></div>
+      <div><label>Email (login) *</label><input type="email" id="af-email"/></div>
+      <div><label>Heslo *<span id="af-pass-hint" style="font-weight:400;color:var(--muted);"> (min. 8 znakov)</span></label>
+        <input type="password" id="af-password" placeholder="Pri editácii nechajte prázdne ak nemeníte"/>
+      </div>
+      <div><label>Iniciály * (napr. JB)</label><input id="af-initials" maxlength="5" style="text-transform:uppercase;"/></div>
+      <div><label>Stredisko</label><input id="af-stredisko" placeholder="ZA"/></div>
+      <div><label>Telefón</label><input id="af-phone" placeholder="+421 9xx xxx xxx"/></div>
+      <div>
+        <label>Oprávnenie na firmy *</label>
+        <div style="display:flex;gap:10px;margin-top:6px;" id="af-companies"></div>
+      </div>
+      <div>
+        <label>Rola v schvaľovacom procese</label>
+        <select id="af-approval-level">
+          <option value="0">Vystavovateľ (bez schvaľovacieho práva)</option>
+          <option value="1">Vedúci strediska (schvaľuje 1. úroveň)</option>
+          <option value="2">Riaditeľ (schvaľuje 2. úroveň)</option>
+        </select>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;padding-top:20px;">
+        <input type="checkbox" id="af-is-admin" style="width:auto;"/>
+        <label for="af-is-admin" style="margin:0;color:var(--text);font-weight:400;">Administrátor (správa používateľov)</label>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;padding-top:20px;">
+        <input type="checkbox" id="af-is-active" style="width:auto;" checked/>
+        <label for="af-is-active" style="margin:0;color:var(--text);font-weight:400;">Aktívny účet</label>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:14px;">
+      <button id="af-save-btn">💾 Uložiť</button>
+      <button class="secondary" id="af-cancel-btn">Zrušiť</button>
+    </div>
+  </div>
+</section>
 
 <div id="print-area"></div>
 
@@ -339,6 +470,7 @@ async function init(user) {
   el('app-view').style.display = 'flex';
   el('user-name').textContent = p.full_name + ' (' + p.initials + ')';
   await loadAll();
+  initAdminPanel();
 }
 
 // ── LOAD DATA ──────────────────────────────────────────────────────────
@@ -444,6 +576,8 @@ async function openOrder(order) {
       + S.viewItems.map(i=>`<tr><td>${esc(i.description)}</td></tr>`).join('') + '</tbody>';
   }
   S.lastOrder = order; S.lastItems = S.viewItems;
+  renderStatusBadge(order.status||'vystavena');
+  await loadApprovalPanel(order);
 }
 
 el('view-excel-btn').addEventListener('click', () => exportExcel(S.viewOrder, S.viewItems));
@@ -492,7 +626,7 @@ function cloneOrder(order, items) {
 
 // ── STEPS ───────────────────────────────────────────────────────────────
 function showStep(id) {
-  ['view-order','step-company','step-template','step-form','step-result'].forEach(s=>el(s).classList.add('hidden'));
+  ['view-order','step-company','step-template','step-form','step-result','admin-panel'].forEach(s=>el(s).classList.add('hidden'));
   el(id).classList.remove('hidden');
 }
 
@@ -683,6 +817,53 @@ el('order-form').addEventListener('submit', async e => {
 
   if(!ok) return;
   el('submit-btn').disabled=true;
+
+  // ── EDIT MODE ──────────────────────────────────────────────────────
+  if (S.editingOrder) {
+    try {
+      if(isNew){
+        const {data:ins,error:ie}=await supabaseClient.from('suppliers').insert(newSupData).select().single();
+        if(ie){ el('form-error').textContent='Chyba: '+ie.message; el('form-error').classList.remove('hidden'); el('submit-btn').disabled=false; return; }
+        supplier=ins; S.suppliers.push(ins); buildDatalists();
+      }
+      const snap={name:supplier.name,address:supplier.address,zip:supplier.zip,city:supplier.city,
+        ico:supplier.ico,dic:supplier.dic,contact_person:supplier.contact_person,phone:supplier.phone,email:supplier.email};
+      const {data:updOrder, error:ue} = await supabaseClient.rpc('update_order', {
+        p_order_id:       S.editingOrder.id,
+        p_template_code:  S.selTemplate.code,
+        p_zakazka_cislo:  zakazka.cislo,
+        p_supplier_id:    supplier.id,
+        p_supplier_snapshot: snap,
+        p_intro_text:     el('intro-text').value.trim()||null,
+        p_billing_note:   el('billing-note').value.trim()||null,
+        p_attachment_note:el('attachment-note').value.trim()||null,
+        p_delivery_date:  ddVal||null,
+        p_payment_method: document.querySelector('input[name="payment"]:checked').value,
+        p_doprava:        el('doprava').value.trim()||null,
+        p_sprava:         el('sprava').value.trim()||null,
+        p_note:           el('note').value.trim()||null,
+        p_items:          items,
+        p_order_date:     orderDate
+      });
+      if(ue){ el('form-error').textContent='Chyba: '+ue.message; el('form-error').classList.remove('hidden'); el('submit-btn').disabled=false; return; }
+      // Refresh items
+      const {data:oItems}=await supabaseClient.from('order_items').select('*').eq('order_id',updOrder.id).order('position');
+      updOrder.order_date=orderDate;
+      S.orders = S.orders.map(o=>o.id===updOrder.id?{...updOrder,supplier_snapshot:snap}:o);
+      S.viewOrder = {...updOrder, supplier_snapshot:snap};
+      S.editingOrder = null;
+      // Reset form UI
+      el('form-edit-badge').classList.add('hidden');
+      el('form-title').textContent='3. Vyplňte objednávku';
+      el('submit-btn').textContent='Vystaviť objednávku';
+      el('back-btn').classList.remove('hidden');
+      el('cancel-edit-btn').classList.add('hidden');
+      renderSidebar(el('sidebar-search').value);
+      await openOrder(S.viewOrder);
+      alert('Objednávka č. '+updOrder.order_number+' bola úspešne aktualizovaná.');
+    } finally { el('submit-btn').disabled=false; }
+    return;
+  }
   try{
     if(isNew){
       const {data:ins,error:ie}=await supabaseClient.from('suppliers').insert(newSupData).select().single();
@@ -890,6 +1071,12 @@ async function buildXlsx(order, items) {
     SC(r,17,Number(order.total_amount),{bold:true,h:'right',b:true,f:'FFD9D9D9',n:'#,##0.00 €'});
   }
 
+  // ── Ukotvenie spodnej časti na dolnú polovicu A4 ──────────────────────
+  // Spodná sekcia (Podrobnosti platby + Schválenie + Poznámky) zaberá ~20 riadkov.
+  // Fixovaný začiatok = riadok 52. Ak je obsah kratší, dopĺňame prázdne riadky.
+  const BOTTOM_START = 52;
+  while(r < BOTTOM_START - 1) { r++; ws.getRow(r).height=14; }
+
   // Platba
   r+=2; ws.getRow(r).height=14;
   M(r,4,r,8); SC(r,4,'Podrobnosti platby',{bold:true});
@@ -1078,6 +1265,504 @@ ${order.note?`<div class="notes-box"><strong>Poznámky / pripomienky:</strong><b
   const w=window.open('','_blank','width=900,height=700');
   if(w){ w.document.write(html); w.document.close(); }
 }
+
+// ── EDIT MODE ─────────────────────────────────────────────────────────────
+S.editingOrder = null; // ak nie je null, formulár je v režime editácie
+
+el('view-edit-btn').addEventListener('click', () => startEdit(S.viewOrder, S.viewItems));
+el('cancel-edit-btn').addEventListener('click', () => {
+  S.editingOrder = null;
+  openOrder(S.viewOrder);
+});
+
+function startEdit(order, items) {
+  if (order.status !== 'vystavena') {
+    alert('Editovať sa dá len objednávka v stave "Vystavená". Objednávka v schvaľovacom procese sa nedá meniť.');
+    return;
+  }
+  S.editingOrder = order;
+  const tpl = S.templates.find(t=>t.code===order.template_code);
+  if (!tpl) { alert('Neznáma šablóna'); return; }
+  S.selTemplate = tpl;
+  S.selCompany = S.companies.find(c=>c.code===order.company_code) || S.companies[0];
+
+  ['step-company','step-template','view-order','step-result'].forEach(id=>el(id).classList.add('hidden'));
+  el('step-form').classList.remove('hidden');
+  el('form-edit-badge').classList.remove('hidden');
+  el('form-title').textContent = 'Editácia objednávky č. ' + order.order_number;
+  el('submit-btn').textContent = '💾 Uložiť zmeny';
+  el('back-btn').classList.add('hidden');
+  el('cancel-edit-btn').classList.remove('hidden');
+  el('form-error').classList.add('hidden');
+
+  buildItemsHead(tpl);
+  ['err-order-date','err-zakazka','err-supplier','err-new-supplier','err-items','err-delivery-date']
+    .forEach(id=>setErr(id,''));
+
+  el('order-date').value = order.order_date||today();
+  el('intro-text').value = order.intro_text||'';
+  el('billing-note').value = order.billing_note||'';
+  el('attachment-note').value = order.attachment_note||'';
+  el('delivery-date').value = order.delivery_date||'';
+  el('doprava').value = order.doprava||'';
+  el('sprava').value = order.sprava||'';
+  el('note').value = order.note||'';
+  const pm = document.querySelector(`input[name="payment"][value="${order.payment_method}"]`);
+  if (pm) pm.checked = true;
+
+  tpl.billing_note ? el('billing-note-wrap').classList.remove('hidden') : el('billing-note-wrap').classList.add('hidden');
+  order.attachment_note ? el('attachment-note-wrap').classList.remove('hidden') : el('attachment-note-wrap').classList.add('hidden');
+
+  const z = S.zakazky.find(z=>z.cislo===order.zakazka_cislo);
+  if (z) el('zakazka-input').value = z.cislo+' - '+z.nazov;
+  el('zakazka-input').classList.remove('invalid');
+
+  const sup = order.supplier_snapshot;
+  el('new-supplier-toggle').checked = false;
+  el('new-supplier-fields').classList.add('hidden');
+  el('supplier-input').disabled = false;
+  if (sup) {
+    for (const [k,v] of S.supplierMap) { if (v.ico===sup.ico) { el('supplier-input').value=k; break; } }
+  }
+  el('supplier-input').classList.remove('invalid');
+
+  el('items-body').innerHTML='';
+  items.forEach(it=>addItemRow(it));
+  recalcTotal();
+  el('step-form').scrollIntoView({behavior:'smooth'});
+}
+
+// Modify submit handler to handle both create and update
+const originalSubmit = el('order-form').onsubmit;
+el('order-form').addEventListener('submit', async e => {
+  // This is already handled by the main submit handler above
+  // The edit path is handled by checking S.editingOrder inside the handler
+}, false);
+
+// Patch the existing submit to handle edit mode - we intercept by overriding
+// We need to replace the submit listener - do it via a flag check in the handler
+// The handler already reads S.editingOrder - inject the check there
+
+// ── APPROVAL WORKFLOW ─────────────────────────────────────────────────────
+const EDGE_FUNCTION_URL = SUPABASE_URL.replace('.supabase.co', '.supabase.co/functions/v1') + '/send-notification';
+const STATUS_LABELS = {
+  vystavena:'Vystavená', caka_L1:'Čaká na schválenie L1',
+  schvalena_L1:'Schválená L1', caka_L2:'Čaká na schválenie L2',
+  schvalena:'Schválená', zamietnuta:'Zamietnutá'
+};
+const STATUS_COLORS = {
+  vystavena:'#6b7785', caka_L1:'#e67e22', schvalena_L1:'#2980b9',
+  caka_L2:'#8e44ad', schvalena:'#1e7e34', zamietnuta:'#c0392b'
+};
+
+function renderStatusBadge(status) {
+  const badge = el('view-status-badge');
+  badge.textContent = STATUS_LABELS[status] || status;
+  badge.style.background = (STATUS_COLORS[status]||'#888') + '22';
+  badge.style.color = STATUS_COLORS[status]||'#888';
+  badge.style.border = '1px solid ' + (STATUS_COLORS[status]||'#888');
+}
+
+function getApprovers(level) {
+  return S.profiles ? S.profiles.filter(p=>p.approval_level>=level && p.id!==S.profile.id) : [];
+}
+
+async function loadApprovalPanel(order) {
+  const panel = el('approval-panel');
+  panel.classList.remove('hidden');
+  const status = order.status;
+  const myId = S.profile.id;
+  const myLevel = S.profile.approval_level || 0;
+  const isCreator = order.created_by === myId;
+  const isPendingApprover = order.pending_approver_id === myId;
+
+  // Hide all sub-panels
+  ['ap-submit-l1','ap-approve-l1','ap-submit-l2','ap-approve-l2','ap-rejected-info'].forEach(id=>{
+    el(id).classList.add('hidden');
+  });
+
+  // Load approvers list if not loaded yet
+  if (!S.profiles) {
+    const {data} = await supabaseClient.from('profiles').select('*').eq('is_active',true);
+    S.profiles = data||[];
+  }
+
+  // Load approval history
+  const {data:hist} = await supabaseClient.from('approvals')
+    .select('*').eq('order_id',order.id).order('approved_at');
+  const histDiv = el('ap-history');
+  if (hist && hist.length>0) {
+    histDiv.innerHTML = '<strong style="font-size:12px;color:var(--muted)">História schválení:</strong>';
+    hist.forEach(h => {
+      const approver = S.profiles.find(p=>p.id===h.approver_id);
+      histDiv.innerHTML += `<div style="font-size:12px;margin-top:4px;padding:6px;background:#f8f9fa;border-radius:4px;">
+        <strong>${h.action==='schvalene'?'✓ Schválené':'✗ Zamietnuté'}</strong> – Úroveň ${h.level}
+        – ${approver?.full_name||'?'} – ${fmtD(h.approved_at.slice(0,10))}
+        ${h.note?`<br/><em style="color:var(--muted)">${esc(h.note)}</em>`:''}
+      </div>`;
+    });
+  } else {
+    histDiv.innerHTML = '';
+  }
+
+  // Show edit button only for 'vystavena'
+  el('view-edit-btn').classList.toggle('hidden', status !== 'vystavena');
+
+  // Panel logic
+  if (status === 'vystavena' && isCreator) {
+    // Fill L1 approvers dropdown
+    const sel = el('ap-approver-l1'); sel.innerHTML='<option value="">— vyberte —</option>';
+    getApprovers(1).forEach(p=>{ sel.innerHTML+=`<option value="${p.id}">${esc(p.full_name)}</option>`; });
+    el('ap-submit-l1').classList.remove('hidden');
+  } else if (status === 'caka_L1' && isPendingApprover) {
+    el('ap-approve-l1').classList.remove('hidden');
+    el('ap-reject-note-wrap').classList.add('hidden');
+  } else if (status === 'schvalena_L1' && myLevel >= 1) {
+    // L1 approver can send to L2
+    const sel = el('ap-approver-l2'); sel.innerHTML='<option value="">— vyberte —</option>';
+    getApprovers(2).forEach(p=>{ sel.innerHTML+=`<option value="${p.id}">${esc(p.full_name)}</option>`; });
+    el('ap-submit-l2').classList.remove('hidden');
+  } else if (status === 'caka_L2' && isPendingApprover) {
+    el('ap-approve-l2').classList.remove('hidden');
+    el('ap-reject-l2-note-wrap').classList.add('hidden');
+  } else if (status === 'zamietnuta' && isCreator) {
+    el('ap-rejected-info').classList.remove('hidden');
+    el('ap-rejected-note-text').textContent = 'Zamietnuté: ' + (order.rejection_note||'bez komentára');
+  }
+}
+
+async function sendNotification(type, toEmail, toName, orderNumber, senderName, note) {
+  try {
+    const {data:{session}} = await supabaseClient.auth.getSession();
+    await fetch(EDGE_FUNCTION_URL, {
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'Authorization':'Bearer '+session.access_token
+      },
+      body: JSON.stringify({type, to_email:toEmail, to_name:toName, order_number:orderNumber, sender_name:senderName, note})
+    });
+  } catch(e) { console.warn('Email notification failed:', e); }
+}
+
+// Submit L1
+el('ap-submit-l1-btn').addEventListener('click', async () => {
+  const approverId = el('ap-approver-l1').value;
+  if (!approverId) { alert('Vyberte schvaľovateľa.'); return; }
+  el('ap-submit-l1-btn').disabled = true;
+  const {data, error} = await supabaseClient.rpc('submit_for_approval', {
+    p_order_id: S.viewOrder.id, p_approver_id: approverId
+  });
+  el('ap-submit-l1-btn').disabled = false;
+  if (error) { alert('Chyba: '+error.message); return; }
+  await sendNotification('new_approval_L1', data.approver_email, data.approver_name,
+    data.order_number, S.profile.full_name);
+  S.viewOrder.status = 'caka_L1';
+  S.viewOrder.pending_approver_id = approverId;
+  S.orders = S.orders.map(o=>o.id===S.viewOrder.id?{...o,status:'caka_L1',pending_approver_id:approverId}:o);
+  renderSidebar(el('sidebar-search').value);
+  renderStatusBadge('caka_L1');
+  await loadApprovalPanel(S.viewOrder);
+  alert('Objednávka odoslaná na schválenie. Email bol odoslaný schvaľovateľovi.');
+});
+
+// Approve L1
+el('ap-approve-l1-btn').addEventListener('click', async () => {
+  el('ap-approve-l1-btn').disabled = true;
+  const {data, error} = await supabaseClient.rpc('approve_order', {
+    p_order_id: S.viewOrder.id, p_action: 'schvalene'
+  });
+  el('ap-approve-l1-btn').disabled = false;
+  if (error) { alert('Chyba: '+error.message); return; }
+  S.viewOrder.status = 'schvalena_L1';
+  S.orders = S.orders.map(o=>o.id===S.viewOrder.id?{...o,status:'schvalena_L1'}:o);
+  renderSidebar(el('sidebar-search').value);
+  renderStatusBadge('schvalena_L1');
+  await loadApprovalPanel(S.viewOrder);
+  alert('Schválené na 1. úrovni. Teraz odošlite objednávku riaditeľovi na 2. úroveň schválenia.');
+});
+
+// Reject L1
+el('ap-reject-l1-btn').addEventListener('click', () => {
+  el('ap-reject-note-wrap').classList.toggle('hidden');
+});
+el('ap-reject-confirm-btn').addEventListener('click', async () => {
+  const note = el('ap-reject-note').value.trim();
+  if (!note) { alert('Uveďte dôvod zamietnutia.'); return; }
+  el('ap-reject-confirm-btn').disabled = true;
+  const {data, error} = await supabaseClient.rpc('approve_order', {
+    p_order_id: S.viewOrder.id, p_action: 'zamietnute', p_note: note
+  });
+  el('ap-reject-confirm-btn').disabled = false;
+  if (error) { alert('Chyba: '+error.message); return; }
+  await sendNotification('rejected', data.creator_email, data.creator_name,
+    data.order_number, data.approver_name, note);
+  S.viewOrder.status = 'zamietnuta'; S.viewOrder.rejection_note = note;
+  S.orders = S.orders.map(o=>o.id===S.viewOrder.id?{...o,status:'zamietnuta',rejection_note:note}:o);
+  renderSidebar(el('sidebar-search').value);
+  renderStatusBadge('zamietnuta');
+  await loadApprovalPanel(S.viewOrder);
+});
+
+// Submit L2
+el('ap-submit-l2-btn').addEventListener('click', async () => {
+  const approverId = el('ap-approver-l2').value;
+  if (!approverId) { alert('Vyberte riaditeľa.'); return; }
+  el('ap-submit-l2-btn').disabled = true;
+  const {data, error} = await supabaseClient.rpc('submit_for_approval_l2', {
+    p_order_id: S.viewOrder.id, p_approver_id: approverId
+  });
+  el('ap-submit-l2-btn').disabled = false;
+  if (error) { alert('Chyba: '+error.message); return; }
+  await sendNotification('new_approval_L2', data.approver_email, data.approver_name,
+    data.order_number, S.profile.full_name);
+  S.viewOrder.status = 'caka_L2'; S.viewOrder.pending_approver_id = approverId;
+  S.orders = S.orders.map(o=>o.id===S.viewOrder.id?{...o,status:'caka_L2',pending_approver_id:approverId}:o);
+  renderSidebar(el('sidebar-search').value);
+  renderStatusBadge('caka_L2');
+  await loadApprovalPanel(S.viewOrder);
+  alert('Objednávka odoslaná riaditeľovi. Email bol odoslaný.');
+});
+
+// Approve L2
+el('ap-approve-l2-btn').addEventListener('click', async () => {
+  el('ap-approve-l2-btn').disabled = true;
+  const {data, error} = await supabaseClient.rpc('approve_order', {
+    p_order_id: S.viewOrder.id, p_action: 'schvalene'
+  });
+  el('ap-approve-l2-btn').disabled = false;
+  if (error) { alert('Chyba: '+error.message); return; }
+  // Notify creator and L1 approver
+  await sendNotification('approved', data.creator_email, data.creator_name, data.order_number, data.approver_name);
+  S.viewOrder.status = 'schvalena';
+  S.orders = S.orders.map(o=>o.id===S.viewOrder.id?{...o,status:'schvalena'}:o);
+  renderSidebar(el('sidebar-search').value);
+  renderStatusBadge('schvalena');
+  await loadApprovalPanel(S.viewOrder);
+  alert('Objednávka plne schválená! Vystavovateľ dostal email. Objednávka je pripravená na stiahnutie.');
+});
+
+// Reject L2
+el('ap-reject-l2-btn').addEventListener('click', () => {
+  el('ap-reject-l2-note-wrap').classList.toggle('hidden');
+});
+el('ap-reject-l2-confirm-btn').addEventListener('click', async () => {
+  const note = el('ap-reject-l2-note').value.trim();
+  if (!note) { alert('Uveďte dôvod zamietnutia.'); return; }
+  el('ap-reject-l2-confirm-btn').disabled = true;
+  const {data, error} = await supabaseClient.rpc('approve_order', {
+    p_order_id: S.viewOrder.id, p_action: 'zamietnute', p_note: note
+  });
+  el('ap-reject-l2-confirm-btn').disabled = false;
+  if (error) { alert('Chyba: '+error.message); return; }
+  await sendNotification('rejected', data.creator_email, data.creator_name,
+    data.order_number, data.approver_name, note);
+  S.viewOrder.status = 'zamietnuta'; S.viewOrder.rejection_note = note;
+  S.orders = S.orders.map(o=>o.id===S.viewOrder.id?{...o,status:'zamietnuta',rejection_note:note}:o);
+  renderSidebar(el('sidebar-search').value);
+  renderStatusBadge('zamietnuta');
+  await loadApprovalPanel(S.viewOrder);
+});
+
+// Resubmit after rejection
+el('ap-resubmit-btn').addEventListener('click', () => {
+  // Reset status to vystavena first - user must edit and resubmit
+  // We allow edit directly
+  startEdit(S.viewOrder, S.viewItems);
+});
+
+// ── ADMIN PANEL ────────────────────────────────────────────────────────────
+const MANAGE_USERS_URL = SUPABASE_URL.replace('.supabase.co','.supabase.co/functions/v1') + '/manage-users';
+
+async function callManageUsers(body) {
+  const {data:{session}} = await supabaseClient.auth.getSession();
+  const res = await fetch(MANAGE_USERS_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + session.access_token
+    },
+    body: JSON.stringify(body)
+  });
+  return res.json();
+}
+
+function initAdminPanel() {
+  if (!S.profile?.is_admin) return;
+  el('admin-btn').style.display = 'block';
+}
+
+el('admin-btn').addEventListener('click', async () => {
+  ['view-order','step-company','step-template','step-form','step-result'].forEach(id=>el(id).classList.add('hidden'));
+  el('admin-panel').classList.remove('hidden');
+  el('admin-form-wrap').classList.add('hidden');
+  el('admin-error').classList.add('hidden');
+  await loadAdminUserList();
+  buildCompanyCheckboxes(null);
+});
+
+async function loadAdminUserList() {
+  el('admin-user-list').innerHTML = '<div style="color:var(--muted);font-size:13px;">Načítavam...</div>';
+  const result = await callManageUsers({ action: 'list' });
+  if (!result.ok) {
+    el('admin-error').textContent = result.error || 'Chyba';
+    el('admin-error').classList.remove('hidden');
+    return;
+  }
+  const users = result.users || [];
+  if (!users.length) { el('admin-user-list').innerHTML = '<div style="color:var(--muted);font-size:13px;">Žiadni používatelia</div>'; return; }
+
+  const LEVEL_LABELS = ['Vystavovateľ','Vedúci L1','Riaditeľ L2'];
+  const STATUS_COLORS2 = {true:'#1e7e34', false:'#c0392b'};
+
+  el('admin-user-list').innerHTML = `
+    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead><tr style="background:#f0f3f7;">
+        <th style="padding:7px 8px;text-align:left;border:1px solid var(--border);">Meno</th>
+        <th style="padding:7px 8px;text-align:left;border:1px solid var(--border);">Email</th>
+        <th style="padding:7px 8px;text-align:left;border:1px solid var(--border);">Iniciály</th>
+        <th style="padding:7px 8px;text-align:left;border:1px solid var(--border);">Stredisko</th>
+        <th style="padding:7px 8px;text-align:left;border:1px solid var(--border);">Firmy</th>
+        <th style="padding:7px 8px;text-align:left;border:1px solid var(--border);">Rola</th>
+        <th style="padding:7px 8px;text-align:left;border:1px solid var(--border);">Stav</th>
+        <th style="padding:7px 8px;border:1px solid var(--border);">Akcie</th>
+      </tr></thead>
+      <tbody>
+        ${users.map(u=>`<tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:6px 8px;border:1px solid var(--border);">${esc(u.full_name)}${u.is_admin?' <span style="font-size:10px;background:#1f5fa8;color:#fff;padding:1px 5px;border-radius:3px;">admin</span>':''}</td>
+          <td style="padding:6px 8px;border:1px solid var(--border);">${esc(u.email||'')}</td>
+          <td style="padding:6px 8px;border:1px solid var(--border);font-weight:700;">${esc(u.initials)}</td>
+          <td style="padding:6px 8px;border:1px solid var(--border);">${esc(u.stredisko)}</td>
+          <td style="padding:6px 8px;border:1px solid var(--border);">${(u.allowed_company_codes||[]).join(', ')}</td>
+          <td style="padding:6px 8px;border:1px solid var(--border);">${LEVEL_LABELS[u.approval_level||0]}</td>
+          <td style="padding:6px 8px;border:1px solid var(--border);">
+            <span style="color:${STATUS_COLORS2[u.is_active]};font-weight:600;">${u.is_active?'Aktívny':'Neaktívny'}</span>
+          </td>
+          <td style="padding:6px 8px;border:1px solid var(--border);white-space:nowrap;">
+            <button class="secondary" style="font-size:12px;padding:4px 8px;" onclick="openEditUser('${u.id}')">✏️ Editovať</button>
+          </td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+  S.adminUsers = users;
+}
+
+function buildCompanyCheckboxes(selectedCodes) {
+  const wrap = el('af-companies');
+  wrap.innerHTML = '';
+  S.companies.forEach(c => {
+    const checked = !selectedCodes || selectedCodes.includes(c.code);
+    wrap.innerHTML += `<label style="display:flex;align-items:center;gap:4px;font-weight:400;color:var(--text);">
+      <input type="checkbox" data-code="${c.code}" ${checked?'checked':''} style="width:auto;"/> ${esc(c.name)}
+    </label>`;
+  });
+}
+
+function getSelectedCompanies() {
+  return [...el('af-companies').querySelectorAll('input[data-code]:checked')].map(i=>i.dataset.code);
+}
+
+S.editingUserId = null;
+
+el('admin-add-btn').addEventListener('click', () => {
+  S.editingUserId = null;
+  el('admin-form-title').textContent = 'Nový používateľ';
+  el('af-name').value = '';
+  el('af-email').value = '';
+  el('af-password').value = '';
+  el('af-initials').value = '';
+  el('af-stredisko').value = 'ZA';
+  el('af-phone').value = '';
+  el('af-approval-level').value = '0';
+  el('af-is-admin').checked = false;
+  el('af-is-active').checked = true;
+  el('af-pass-hint').textContent = ' (min. 8 znakov)';
+  el('af-password').required = true;
+  buildCompanyCheckboxes(null);
+  el('admin-form-wrap').classList.remove('hidden');
+  el('admin-form-wrap').scrollIntoView({behavior:'smooth'});
+});
+
+window.openEditUser = function(userId) {
+  const u = (S.adminUsers||[]).find(x=>x.id===userId);
+  if (!u) return;
+  S.editingUserId = userId;
+  el('admin-form-title').textContent = 'Editácia: ' + u.full_name;
+  el('af-name').value = u.full_name;
+  el('af-email').value = u.email||'';
+  el('af-password').value = '';
+  el('af-initials').value = u.initials;
+  el('af-stredisko').value = u.stredisko;
+  el('af-phone').value = u.phone||'';
+  el('af-approval-level').value = String(u.approval_level||0);
+  el('af-is-admin').checked = !!u.is_admin;
+  el('af-is-active').checked = !!u.is_active;
+  el('af-pass-hint').textContent = ' (nechajte prázdne ak nemeníte)';
+  el('af-password').required = false;
+  buildCompanyCheckboxes(u.allowed_company_codes||[]);
+  el('admin-form-wrap').classList.remove('hidden');
+  el('admin-form-wrap').scrollIntoView({behavior:'smooth'});
+};
+
+el('af-cancel-btn').addEventListener('click', () => {
+  el('admin-form-wrap').classList.add('hidden');
+  S.editingUserId = null;
+});
+
+el('af-save-btn').addEventListener('click', async () => {
+  el('admin-error').classList.add('hidden');
+  const name    = el('af-name').value.trim();
+  const email   = el('af-email').value.trim();
+  const pass    = el('af-password').value;
+  const init    = el('af-initials').value.trim().toUpperCase();
+  const stred   = el('af-stredisko').value.trim() || 'ZA';
+  const phone   = el('af-phone').value.trim();
+  const level   = parseInt(el('af-approval-level').value);
+  const isAdmin = el('af-is-admin').checked;
+  const isAct   = el('af-is-active').checked;
+  const codes   = getSelectedCompanies();
+
+  if (!name || !email || !init) {
+    el('admin-error').textContent = 'Vyplňte aspoň Meno, Email a Iniciály.';
+    el('admin-error').classList.remove('hidden'); return;
+  }
+  if (codes.length === 0) {
+    el('admin-error').textContent = 'Vyberte aspoň jednu firmu.';
+    el('admin-error').classList.remove('hidden'); return;
+  }
+  if (!S.editingUserId && pass.length < 8) {
+    el('admin-error').textContent = 'Heslo musí mať aspoň 8 znakov.';
+    el('admin-error').classList.remove('hidden'); return;
+  }
+  if (S.editingUserId && pass && pass.length < 8) {
+    el('admin-error').textContent = 'Heslo musí mať aspoň 8 znakov.';
+    el('admin-error').classList.remove('hidden'); return;
+  }
+
+  el('af-save-btn').disabled = true;
+  const payload = S.editingUserId
+    ? { action:'update', user_id:S.editingUserId, email, full_name:name,
+        initials:init, stredisko:stred, phone, allowed_company_codes:codes,
+        approval_level:level, is_admin:isAdmin, is_active:isAct,
+        ...(pass ? {password:pass} : {}) }
+    : { action:'create', email, password:pass, full_name:name,
+        initials:init, stredisko:stred, phone, allowed_company_codes:codes,
+        approval_level:level, is_admin:isAdmin };
+
+  const result = await callManageUsers(payload);
+  el('af-save-btn').disabled = false;
+
+  if (!result.ok) {
+    el('admin-error').textContent = result.error || 'Neznáma chyba';
+    el('admin-error').classList.remove('hidden'); return;
+  }
+  el('admin-form-wrap').classList.add('hidden');
+  S.editingUserId = null;
+  alert(result.message || 'Hotovo.');
+  await loadAdminUserList();
+  // Obnov zoznam profilov pre schvaľovanie
+  S.profiles = null;
+});
 
 checkSession();
 </script>
