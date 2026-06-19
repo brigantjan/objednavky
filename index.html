@@ -118,6 +118,7 @@ td.total-cell{text-align:right;font-weight:600;white-space:nowrap;}
 
     <aside class="sidebar">
       <div class="sidebar-header">
+        <button class="new-order-btn" id="dashboard-btn" style="background:#1f5fa8;margin:0 0 8px;">🏠 Prehľad</button>
         <h3>Vystavené objednávky</h3>
         <input class="sidebar-search" id="sidebar-search" placeholder="Číslo / dodávateľ / zákazka..." type="search"/>
       </div>
@@ -130,6 +131,51 @@ td.total-cell{text-align:right;font-weight:600;white-space:nowrap;}
 
     <div class="main-content" id="main-content">
       <div id="global-error" class="banner error hidden"></div>
+
+      <!-- DASHBOARD -->
+      <section class="card hidden" id="dashboard-view">
+        <h2 style="margin-bottom:4px;">Vitajte, <span id="dash-name"></span></h2>
+        <p style="color:var(--muted);font-size:13px;margin-bottom:18px;">Prehľad objednávok a schvaľovania</p>
+
+        <!-- Štatistiky -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:22px;" id="dash-stats"></div>
+
+        <!-- Čaká na moje schválenie -->
+        <div id="dash-section-approve" class="hidden" style="margin-bottom:24px;">
+          <h3 style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+            <span style="background:#e67e22;color:#fff;border-radius:50%;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;" id="dash-approve-count">0</span>
+            Čaká na moje schválenie
+          </h3>
+          <div id="dash-approve-list"></div>
+        </div>
+
+        <!-- Vrátené mne na opravu -->
+        <div id="dash-section-returned" class="hidden" style="margin-bottom:24px;">
+          <h3 style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+            <span style="background:#e67e22;color:#fff;border-radius:50%;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;" id="dash-returned-count">0</span>
+            Vrátené mi na opravu
+          </h3>
+          <div id="dash-returned-list"></div>
+        </div>
+
+        <!-- Moje rozpracované -->
+        <div id="dash-section-draft" class="hidden" style="margin-bottom:24px;">
+          <h3 style="margin-bottom:10px;">📝 Moje rozpracované objednávky (ešte neodoslané)</h3>
+          <div id="dash-draft-list"></div>
+        </div>
+
+        <!-- V procese schvaľovania -->
+        <div id="dash-section-pending" class="hidden" style="margin-bottom:24px;">
+          <h3 style="margin-bottom:10px;">⏳ Moje objednávky v procese schvaľovania</h3>
+          <div id="dash-pending-list"></div>
+        </div>
+
+        <!-- Posledné schválené -->
+        <div id="dash-section-approved" class="hidden" style="margin-bottom:24px;">
+          <h3 style="margin-bottom:10px;">✓ Naposledy schválené (pripravené na stiahnutie)</h3>
+          <div id="dash-approved-list"></div>
+        </div>
+      </section>
 
       <!-- DETAIL -->
       <section class="card hidden" id="view-order">
@@ -502,7 +548,8 @@ async function loadAll() {
   buildDatalists();
   renderCompanyTiles();
   renderSidebar();
-  showStep('step-company');
+  renderDashboard();
+  showStep('dashboard-view');
 }
 
 // ── SIDEBAR ────────────────────────────────────────────────────────────
@@ -531,6 +578,127 @@ function renderSidebar(q) {
 }
 
 el('sidebar-search').addEventListener('input', e => renderSidebar(e.target.value));
+
+el('dashboard-btn').addEventListener('click', async () => {
+  S.viewOrder = null;
+  renderSidebar(el('sidebar-search').value);
+  await renderDashboard();
+  showStep('dashboard-view');
+});
+
+// ── DASHBOARD ──────────────────────────────────────────────────────────────
+function orderRowHtml(o, extraNote) {
+  const sup = o.supplier_snapshot?.name || '—';
+  return `<div class="order-item" style="cursor:pointer;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:6px;" onclick="window.__openOrderById('${o.id}')">
+    <div class="oi-num">${esc(o.order_number)}</div>
+    <div class="oi-sup">${esc(sup)}</div>
+    <div class="oi-date">${fmtD(o.order_date)}${o.total_amount?' · '+fmt(o.total_amount):''}</div>
+    ${extraNote ? `<div style="font-size:11px;color:#e67e22;margin-top:3px;">${esc(extraNote)}</div>` : ''}
+  </div>`;
+}
+
+window.__openOrderById = function(id) {
+  const o = S.orders.find(x=>x.id===id);
+  if (o) openOrder(o);
+};
+
+async function renderDashboard() {
+  el('dash-name').textContent = S.profile.full_name;
+  const myId = S.profile.id;
+  const myLevel = S.profile.approval_level || 0;
+
+  // Potrebujeme aktuálne dáta - znovu načítaj orders (mohli sa zmeniť)
+  const {data: freshOrders} = await supabaseClient.from('orders').select('*').order('sequence_number',{ascending:false});
+  S.orders = freshOrders || [];
+
+  const myOrders       = S.orders.filter(o => o.created_by === myId);
+  const waitingForMe   = S.orders.filter(o => o.pending_approver_id === myId && (o.status==='caka_L1'||o.status==='caka_L2'));
+  const returnedToMe   = myOrders.filter(o => o.status === 'vystavena' && o.rejection_note);
+  const draftMine      = myOrders.filter(o => o.status === 'vystavena' && !o.rejection_note);
+  const pendingMine    = myOrders.filter(o => ['caka_L1','schvalena_L1','caka_L2'].includes(o.status));
+  const approvedRecent = myOrders.filter(o => o.status === 'schvalena')
+                                  .sort((a,b)=> new Date(b.updated_at||b.order_date) - new Date(a.updated_at||a.order_date))
+                                  .slice(0,5);
+
+  // Štatistiky
+  const thisMonth = new Date().toISOString().slice(0,7);
+  const monthOrders = S.orders.filter(o => (o.order_date||'').startsWith(thisMonth));
+  const monthTotal = monthOrders.reduce((s,o)=>s+(Number(o.total_amount)||0),0);
+
+  const stats = [
+    {label:'Čaká na moje schválenie', value:waitingForMe.length, color:'#e67e22'},
+    {label:'Vrátené mi na opravu', value:returnedToMe.length, color:'#c0392b'},
+    {label:'Moje rozpracované', value:draftMine.length, color:'#6b7785'},
+    {label:'V procese schvaľovania', value:pendingMine.length, color:'#2980b9'},
+    {label:'Objednávky tento mesiac', value:monthOrders.length, color:'#1f5fa8'},
+    {label:'Suma tento mesiac', value:fmt(monthTotal), color:'#1e7e34'},
+  ];
+  el('dash-stats').innerHTML = stats.map(s=>`
+    <div style="background:#fff;border:1px solid var(--border);border-left:4px solid ${s.color};border-radius:var(--radius);padding:12px 14px;">
+      <div style="font-size:22px;font-weight:700;color:${s.color};">${s.value}</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:2px;">${s.label}</div>
+    </div>`).join('');
+
+  // Čaká na moje schválenie
+  if (waitingForMe.length > 0) {
+    el('dash-section-approve').classList.remove('hidden');
+    el('dash-approve-count').textContent = waitingForMe.length;
+    el('dash-approve-list').innerHTML = waitingForMe.map(o=>{
+      const level = o.status==='caka_L1' ? '1. úroveň (vedúci)' : '2. úroveň (riaditeľ)';
+      return orderRowHtml(o, 'Čaká na schválenie - ' + level);
+    }).join('');
+  } else {
+    el('dash-section-approve').classList.add('hidden');
+  }
+
+  // Vrátené mne na opravu
+  if (returnedToMe.length > 0) {
+    el('dash-section-returned').classList.remove('hidden');
+    el('dash-returned-count').textContent = returnedToMe.length;
+    el('dash-returned-list').innerHTML = returnedToMe.map(o=>
+      orderRowHtml(o, 'Dôvod: ' + (o.rejection_note||''))
+    ).join('');
+  } else {
+    el('dash-section-returned').classList.add('hidden');
+  }
+
+  // Moje rozpracované
+  if (draftMine.length > 0) {
+    el('dash-section-draft').classList.remove('hidden');
+    el('dash-draft-list').innerHTML = draftMine.map(o=>orderRowHtml(o)).join('');
+  } else {
+    el('dash-section-draft').classList.add('hidden');
+  }
+
+  // V procese schvaľovania (moje, čakajúce na niekoho iného)
+  if (pendingMine.length > 0) {
+    el('dash-section-pending').classList.remove('hidden');
+    el('dash-pending-list').innerHTML = pendingMine.map(o=>{
+      const label = STATUS_LABELS[o.status] || o.status;
+      return orderRowHtml(o, label);
+    }).join('');
+  } else {
+    el('dash-section-pending').classList.add('hidden');
+  }
+
+  // Naposledy schválené
+  if (approvedRecent.length > 0) {
+    el('dash-section-approved').classList.remove('hidden');
+    el('dash-approved-list').innerHTML = approvedRecent.map(o=>orderRowHtml(o)).join('');
+  } else {
+    el('dash-section-approved').classList.add('hidden');
+  }
+
+  // Ak nič z vyššie uvedeného nie je vidno, ukáž uvítaciu správu
+  const anySectionVisible = waitingForMe.length||returnedToMe.length||draftMine.length||pendingMine.length||approvedRecent.length;
+  if (!anySectionVisible) {
+    el('dash-stats').insertAdjacentHTML('afterend',
+      '<p id="dash-empty-msg" style="color:var(--muted);margin-top:10px;">Žiadne aktuálne úlohy. Môžete vystaviť novú objednávku tlačidlom vľavo dole.</p>');
+  } else {
+    document.getElementById('dash-empty-msg')?.remove();
+  }
+}
+
 el('new-order-btn').addEventListener('click', () => {
   S.viewOrder = null; S.cloneData = null;
   showStep('step-company');
@@ -546,7 +714,7 @@ el('new-order-btn').addEventListener('click', () => {
 async function openOrder(order) {
   S.viewOrder = order;
   renderSidebar(el('sidebar-search').value);
-  ['step-company','step-template','step-form','step-result'].forEach(id=>el(id).classList.add('hidden'));
+  ['step-company','step-template','step-form','step-result','dashboard-view','admin-panel'].forEach(id=>el(id).classList.add('hidden'));
   el('view-order').classList.remove('hidden');
   el('view-title').textContent = 'Objednávka č. ' + order.order_number;
 
@@ -638,7 +806,7 @@ function cloneOrder(order, items) {
 
 // ── STEPS ───────────────────────────────────────────────────────────────
 function showStep(id) {
-  ['view-order','step-company','step-template','step-form','step-result','admin-panel'].forEach(s=>el(s).classList.add('hidden'));
+  ['view-order','step-company','step-template','step-form','step-result','admin-panel','dashboard-view'].forEach(s=>el(s).classList.add('hidden'));
   el(id).classList.remove('hidden');
 }
 
@@ -1718,7 +1886,7 @@ function initAdminPanel() {
 }
 
 el('admin-btn').addEventListener('click', async () => {
-  ['view-order','step-company','step-template','step-form','step-result'].forEach(id=>el(id).classList.add('hidden'));
+  ['view-order','step-company','step-template','step-form','step-result','dashboard-view'].forEach(id=>el(id).classList.add('hidden'));
   el('admin-panel').classList.remove('hidden');
   el('admin-form-wrap').classList.add('hidden');
   el('admin-error').classList.add('hidden');
