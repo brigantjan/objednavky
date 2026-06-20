@@ -4,6 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>SUPTel - Objednávkový systém</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css"/>
 <script src="exceljs.bare.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
@@ -142,48 +143,13 @@ td.total-cell{text-align:right;font-weight:600;white-space:nowrap;}
         <p style="color:var(--muted);font-size:13px;margin-bottom:18px;">Prehľad objednávok a schvaľovania</p>
 
         <!-- Štatistiky -->
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:22px;" id="dash-stats"></div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:22px;" id="dash-stats"></div>
 
-        <!-- Čaká na moje schválenie -->
-        <div id="dash-section-approve" class="hidden" style="margin-bottom:24px;">
-          <h3 style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-            <span style="background:#e67e22;color:#fff;border-radius:50%;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;" id="dash-approve-count">0</span>
-            Čaká na moje schválenie
-          </h3>
-          <div id="dash-approve-list"></div>
-        </div>
-
-        <!-- Vrátené mne na opravu -->
-        <div id="dash-section-returned" class="hidden" style="margin-bottom:24px;">
-          <h3 style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-            <span style="background:#e67e22;color:#fff;border-radius:50%;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;" id="dash-returned-count">0</span>
-            Vrátené mi na opravu
-          </h3>
-          <div id="dash-returned-list"></div>
-        </div>
-
-        <!-- Moje rozpracované -->
-        <div id="dash-section-draft" class="hidden" style="margin-bottom:24px;">
-          <h3 style="margin-bottom:10px;">📝 Moje rozpracované objednávky (ešte neodoslané)</h3>
-          <div id="dash-draft-list"></div>
-        </div>
-
-        <!-- Mnou postúpené ďalej -->
-        <div id="dash-section-postupene" class="hidden" style="margin-bottom:24px;">
-          <h3 style="margin-bottom:10px;">📤 Mnou postúpené ďalej (sledujem priebeh)</h3>
-          <div id="dash-postupene-list"></div>
-        </div>
-
-        <!-- V procese schvaľovania -->
-        <div id="dash-section-pending" class="hidden" style="margin-bottom:24px;">
-          <h3 style="margin-bottom:10px;">⏳ Moje objednávky v procese schvaľovania</h3>
-          <div id="dash-pending-list"></div>
-        </div>
-
-        <!-- Posledné schválené -->
-        <div id="dash-section-approved" class="hidden" style="margin-bottom:24px;">
-          <h3 style="margin-bottom:10px;">✓ Naposledy schválené (pripravené na stiahnutie)</h3>
-          <div id="dash-approved-list"></div>
+        <!-- Jednotný zoznam úloh -->
+        <div style="border-top:1px solid var(--color-border-tertiary,var(--border));padding-top:14px;">
+          <p id="dash-attention-title" style="font-size:13px;font-weight:600;color:var(--muted);margin-bottom:8px;">Vyžaduje vašu pozornosť</p>
+          <div id="dash-attention-list"></div>
+          <p id="dash-empty-msg" class="hidden" style="color:var(--muted);margin-top:10px;font-size:13px;">Žiadne aktuálne úlohy. Môžete vystaviť novú objednávku tlačidlom vľavo dole.</p>
         </div>
       </section>
 
@@ -735,111 +701,105 @@ async function renderDashboard() {
   const waitingForMe    = S.orders.filter(o => o.pending_approver_id === myId && (o.status==='caka_L1'||o.status==='caka_L2'));
   const returnedToMe    = myOrders.filter(o => o.status === 'vystavena' && o.rejection_note);
   const draftMine       = myOrders.filter(o => o.status === 'vystavena' && !o.rejection_note);
-  const pendingMine     = myOrders.filter(o => ['caka_L1','schvalena_L1','caka_L2'].includes(o.status));
+  // Moje vlastné objednávky, ktoré som si AUTOMATICKY schválil vystavením (som vedúci/riaditeľ)
+  // a ešte čakajú na MOJU akciu - poslať ďalej riaditeľovi (len pre vedúceho, status schvalena_L1, nikto iný ich nemá rozpracované)
+  const needForwardMine  = myOrders.filter(o => o.status === 'schvalena_L1' && !o.pending_approver_id);
+  // Objednávky odoslané niekomu inému, čakajúce v cudzom procese (nie čakajúce na MOJU akciu)
+  const pendingMine     = myOrders.filter(o => (o.status==='caka_L1'||o.status==='caka_L2')
+                              || (o.status==='schvalena_L1' && o.pending_approver_id));
   // Objednávky, ktoré NIE sú moje, ale ktoré som JA schválil a postúpil ďalej -
   // sledujem ich, KÝM sa definitívne neuzavrú (plne schválené alebo zamietnuté).
   // Akonáhle dostanú finálny status, miznú odtiaľto (vystavovateľ má svoj dashboard).
   const postupeneMnou   = S.orders.filter(o => o.created_by !== myId && myApprovedOrderIds.has(o.id)
                               && ['caka_L2','schvalena_L1'].includes(o.status));
-  const approvedRecent  = myOrders.filter(o => o.status === 'schvalena')
-                                  .sort((a,b)=> new Date(b.updated_at||b.order_date) - new Date(a.updated_at||a.order_date))
-                                  .slice(0,5);
 
-  // Štatistiky
+  // Štatistiky - 4 kľúčové dlaždice
   const thisMonth = new Date().toISOString().slice(0,7);
-  const monthOrders = S.orders.filter(o => (o.order_date||'').startsWith(thisMonth));
-  const monthTotal = monthOrders.reduce((s,o)=>s+(Number(o.total_amount)||0),0);
-
-  const myApprovedCount = myOrders.filter(o => o.status === 'schvalena').length;
+  const monthApprovedMine = myOrders.filter(o => o.status==='schvalena' && (o.updated_at||o.order_date||'').startsWith(thisMonth));
 
   const stats = [
-    {label:'Čaká na moje schválenie', value:waitingForMe.length, color:'#e67e22', filter:{pendingApproverId:myId}},
-    {label:'Vrátené mi na opravu', value:returnedToMe.length, color:'#c0392b', filter:{createdBy:myId, status:'vystavena', onlyReturned:true}},
-    {label:'Moje rozpracované', value:draftMine.length, color:'#6b7785', filter:{createdBy:myId, status:'vystavena', onlyDraft:true}},
-    {label:'V procese schvaľovania', value:pendingMine.length, color:'#2980b9', filter:{createdBy:myId, statusIn:['caka_L1','schvalena_L1','caka_L2']}},
-    {label:'Mnou postúpené ďalej', value:postupeneMnou.length, color:'#8e44ad', filter:{ids:postupeneMnou.map(o=>o.id)}},
-    {label:'Moje plne schválené', value:myApprovedCount, color:'#1e7e34', filter:{createdBy:myId, status:'schvalena'}},
-    {label:'Objednávky tento mesiac', value:monthOrders.length, color:'#1f5fa8', filter:{month:thisMonth}},
-    {label:'Suma tento mesiac', value:fmt(monthTotal), color:'#1e7e34', filter:{month:thisMonth}},
-    {label:'Všetky objednávky', value:S.orders.length, color:'#1c2733', filter:{}},
+    {label:'Čaká na moje schválenie', value:waitingForMe.length, icon:'ti-clock', tone:'warning', filter:{pendingApproverId:myId}},
+    {label:'Vrátené mi na opravu', value:returnedToMe.length, icon:'ti-arrow-back-up', tone:'danger', filter:{createdBy:myId, status:'vystavena', onlyReturned:true}},
+    {label:'Moje rozpracované', value:draftMine.length, icon:'ti-file-text', tone:'neutral', filter:{createdBy:myId, status:'vystavena', onlyDraft:true}},
+    {label:'Schválené tento mesiac', value:monthApprovedMine.length, icon:'ti-check', tone:'success', filter:{createdBy:myId, status:'schvalena'}},
   ];
-  el('dash-stats').innerHTML = stats.map((s,i)=>`
-    <div style="background:#fff;border:1px solid var(--border);border-left:4px solid ${s.color};border-radius:var(--radius);padding:12px 14px;cursor:pointer;transition:box-shadow .15s;"
-         onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,0.1)'" onmouseout="this.style.boxShadow='none'"
+  const TONE_STYLES = {
+    warning: {bg:'#fdf3e7', fg:'#b9650f'},
+    danger:  {bg:'#fdecea', fg:'#c0392b'},
+    neutral: {bg:'#f0f3f7', fg:'#475467'},
+    success: {bg:'#e9f7ee', fg:'#1e7e34'},
+  };
+  el('dash-stats').innerHTML = stats.map((s,i)=>{
+    const t = TONE_STYLES[s.tone];
+    return `<div style="background:${t.bg};border-radius:10px;padding:14px;cursor:pointer;transition:filter .15s;"
+         onmouseover="this.style.filter='brightness(0.97)'" onmouseout="this.style.filter='none'"
          onclick="window.__openStatFilter(${i})">
-      <div style="font-size:22px;font-weight:700;color:${s.color};">${s.value}</div>
-      <div style="font-size:12px;color:var(--muted);margin-top:2px;">${s.label}</div>
-    </div>`).join('');
+      <div style="font-size:22px;font-weight:600;color:${t.fg};line-height:1;">${s.value}</div>
+      <div style="font-size:12px;color:${t.fg};margin-top:6px;opacity:0.85;">${s.label}</div>
+    </div>`;
+  }).join('');
   S.dashStatFilters = stats.map(s=>s.filter);
 
-  // Čaká na moje schválenie
-  if (waitingForMe.length > 0) {
-    el('dash-section-approve').classList.remove('hidden');
-    el('dash-approve-count').textContent = waitingForMe.length;
-    el('dash-approve-list').innerHTML = waitingForMe.map(o=>{
-      const level = o.status==='caka_L1' ? '1. úroveň (vedúci)' : '2. úroveň (riaditeľ)';
-      return orderRowHtml(o, 'Čaká na schválenie - ' + level);
+  // Jeden zlúčený zoznam, zoradený podľa naliehavosti:
+  // 1) čaká na MOJU akciu (schválenie)
+  // 2) vrátené mne (moja akcia - opraviť)
+  // 3) moje rozpracované (moja akcia - odoslať)
+  // 4) mnou postúpené ďalej (len sledujem)
+  // 5) naposledy schválené (informatívne, najnovšie hore)
+  const attentionItems = [];
+
+  waitingForMe.forEach(o => {
+    const level = o.status==='caka_L1' ? '1. úroveň (vedúci)' : '2. úroveň (riaditeľ)';
+    attentionItems.push({order:o, icon:'ti-clock', tone:'warning', text:'Čaká na vaše schválenie', detail:level});
+  });
+  returnedToMe.forEach(o => {
+    attentionItems.push({order:o, icon:'ti-arrow-back-up', tone:'danger', text:'Vrátená vám na opravu', detail:o.rejection_note||''});
+  });
+  needForwardMine.forEach(o => {
+    attentionItems.push({order:o, icon:'ti-send', tone:'warning', text:'Schválená L1 (vystavili ste sami) - odošlite riaditeľovi', detail:''});
+  });
+  draftMine.forEach(o => {
+    attentionItems.push({order:o, icon:'ti-file-text', tone:'neutral', text:'Rozpracovaná - neodoslaná na schválenie', detail:''});
+  });
+  postupeneMnou.forEach(o => {
+    const label = STATUS_LABELS[o.status] || o.status;
+    attentionItems.push({order:o, icon:'ti-send', tone:'info', text:'Postúpená ďalej - sledujete priebeh', detail:label});
+  });
+  const approvedRecent = myOrders.filter(o => o.status === 'schvalena')
+                                  .sort((a,b)=> new Date(b.updated_at||b.order_date) - new Date(a.updated_at||a.order_date))
+                                  .slice(0,8);
+  approvedRecent.forEach(o => {
+    attentionItems.push({order:o, icon:'ti-check', tone:'success', text:'Plne schválená - pripravená na stiahnutie', detail:''});
+  });
+
+  const ITEM_TONE = {
+    warning: '#b9650f', danger:'#c0392b', neutral:'#6b7785', info:'#2563a8', success:'#1e7e34'
+  };
+
+  const listEl = el('dash-attention-list');
+  if (attentionItems.length === 0) {
+    listEl.innerHTML = '';
+    el('dash-empty-msg').classList.remove('hidden');
+  } else {
+    el('dash-empty-msg').classList.add('hidden');
+    listEl.innerHTML = attentionItems.map(it => {
+      const o = it.order;
+      const color = ITEM_TONE[it.tone];
+      const sup = o.supplier_snapshot?.name || '—';
+      return `<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 4px;border-bottom:1px solid var(--border);cursor:pointer;" onclick="window.__openOrderById('${o.id}')">
+        <i class="ti ${it.icon}" style="font-size:18px;color:${color};margin-top:1px;flex-shrink:0;"></i>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:14px;">
+            <span style="font-weight:600;">${esc(o.order_number)}</span>
+            <span style="color:var(--muted);"> · ${it.text}</span>
+          </div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px;">
+            ${esc(sup)}${o.total_amount?' · '+fmt(o.total_amount):''}${it.detail?' · '+esc(it.detail):''}
+          </div>
+        </div>
+        <i class="ti ti-chevron-right" style="font-size:16px;color:var(--muted);flex-shrink:0;margin-top:3px;"></i>
+      </div>`;
     }).join('');
-  } else {
-    el('dash-section-approve').classList.add('hidden');
-  }
-
-  // Vrátené mne na opravu
-  if (returnedToMe.length > 0) {
-    el('dash-section-returned').classList.remove('hidden');
-    el('dash-returned-count').textContent = returnedToMe.length;
-    el('dash-returned-list').innerHTML = returnedToMe.map(o=>
-      orderRowHtml(o, 'Dôvod: ' + (o.rejection_note||''))
-    ).join('');
-  } else {
-    el('dash-section-returned').classList.add('hidden');
-  }
-
-  // Moje rozpracované
-  if (draftMine.length > 0) {
-    el('dash-section-draft').classList.remove('hidden');
-    el('dash-draft-list').innerHTML = draftMine.map(o=>orderRowHtml(o)).join('');
-  } else {
-    el('dash-section-draft').classList.add('hidden');
-  }
-
-  // V procese schvaľovania (moje, čakajúce na niekoho iného)
-  if (pendingMine.length > 0) {
-    el('dash-section-pending').classList.remove('hidden');
-    el('dash-pending-list').innerHTML = pendingMine.map(o=>{
-      const label = STATUS_LABELS[o.status] || o.status;
-      return orderRowHtml(o, label);
-    }).join('');
-  } else {
-    el('dash-section-pending').classList.add('hidden');
-  }
-
-  // Mnou postúpené ďalej (objednávky cudzie, ktoré som schválil a poslal ďalej)
-  if (postupeneMnou.length > 0) {
-    el('dash-section-postupene').classList.remove('hidden');
-    el('dash-postupene-list').innerHTML = postupeneMnou.map(o=>{
-      const label = STATUS_LABELS[o.status] || o.status;
-      return orderRowHtml(o, label);
-    }).join('');
-  } else {
-    el('dash-section-postupene').classList.add('hidden');
-  }
-
-  // Naposledy schválené
-  if (approvedRecent.length > 0) {
-    el('dash-section-approved').classList.remove('hidden');
-    el('dash-approved-list').innerHTML = approvedRecent.map(o=>orderRowHtml(o)).join('');
-  } else {
-    el('dash-section-approved').classList.add('hidden');
-  }
-
-  // Ak nič z vyššie uvedeného nie je vidno, ukáž uvítaciu správu
-  const anySectionVisible = waitingForMe.length||returnedToMe.length||draftMine.length||pendingMine.length||postupeneMnou.length||approvedRecent.length;
-  if (!anySectionVisible) {
-    el('dash-stats').insertAdjacentHTML('afterend',
-      '<p id="dash-empty-msg" style="color:var(--muted);margin-top:10px;">Žiadne aktuálne úlohy. Môžete vystaviť novú objednávku tlačidlom vľavo dole.</p>');
-  } else {
-    document.getElementById('dash-empty-msg')?.remove();
   }
 }
 
@@ -1892,8 +1852,11 @@ async function loadApprovalPanel(order) {
     histDiv.innerHTML = '';
   }
 
-  // Show edit button only for 'vystavena'
-  el('view-edit-btn').classList.toggle('hidden', status !== 'vystavena');
+  // Editovať sa dá objednávka v stave 'vystavena', alebo 'schvalena_L1'
+  // ak ju vystavil sám vedúci a ešte ju neposlal riaditeľovi (čiže kým
+  // je pending_approver_id prázdne).
+  const canEdit = status === 'vystavena' || (status === 'schvalena_L1' && isCreator && !order.pending_approver_id);
+  el('view-edit-btn').classList.toggle('hidden', !canEdit);
 
   // Panel logic
   if (status === 'vystavena' && isCreator) {
@@ -1910,7 +1873,22 @@ async function loadApprovalPanel(order) {
   } else if (status === 'caka_L1' && !isPendingApprover) {
     el('approval-panel').insertAdjacentHTML('beforeend',
       `<p id="ap-info-msg" style="font-size:12px;color:var(--muted);">Objednávka čaká na schválenie inej osoby (1. úroveň).</p>`);
-  } else if (status === 'schvalena_L1' && myLevel >= 1) {
+  } else if (status === 'schvalena_L1' && isCreator && myLevel === 1 && !order.pending_approver_id) {
+    // Vedúci, ktorý vystavil objednávku sám sebe - automaticky schválená L1,
+    // teraz ju musí poslať riaditeľovi na L2.
+    const approversL2 = getApprovers(2);
+    const sel = el('ap-approver-l2'); sel.innerHTML='<option value="">— vyberte —</option>';
+    approversL2.forEach(p=>{ sel.innerHTML+=`<option value="${p.id}">${esc(p.full_name)}</option>`; });
+    el('ap-submit-l2').classList.remove('hidden');
+    el('ap-submit-l2').insertAdjacentHTML('afterbegin',
+      '<p style="color:#2563a8;font-size:12px;margin-bottom:8px;">ℹ Túto objednávku ste vystavili Vy ako vedúci strediska - automaticky sa považuje za schválenú na 1. úrovni. Teraz ju odošlite riaditeľovi na finálne schválenie.</p>');
+    if (approversL2.length === 0) {
+      el('ap-submit-l2').insertAdjacentHTML('beforeend',
+        '<p style="color:#c0392b;font-size:12px;margin-top:8px;">⚠ Žiadny používateľ nemá nastavenú rolu "Riaditeľ" (approval_level=2). Požiadajte administrátora o nastavenie.</p>');
+    }
+  } else if (status === 'schvalena_L1' && myLevel >= 1 && (!isCreator || order.pending_approver_id)) {
+    // Iný vedúci/riaditeľ môže tiež poslať ďalej (napr. zastupovanie), ale
+    // bez špeciálnej "vystavili ste sami sebe" hlášky.
     const approversL2 = getApprovers(2);
     const sel = el('ap-approver-l2'); sel.innerHTML='<option value="">— vyberte —</option>';
     approversL2.forEach(p=>{ sel.innerHTML+=`<option value="${p.id}">${esc(p.full_name)}</option>`; });
@@ -1921,6 +1899,11 @@ async function loadApprovalPanel(order) {
     }
   } else if (status === 'caka_L2' && isPendingApprover) {
     el('ap-approve-l2').classList.remove('hidden');
+  } else if (status === 'schvalena' && isCreator && S.profile.approval_level === 2 && (!hist || hist.length<=2)) {
+    // Riaditeľ vystavil objednávku sám sebe - rovno plne schválená,
+    // informačná hláška namiesto akčného panelu.
+    el('approval-panel').insertAdjacentHTML('beforeend',
+      `<p id="ap-info-msg" style="font-size:12px;color:#1e7e34;">✓ Túto objednávku ste vystavili Vy ako riaditeľ - automaticky je plne schválená, nikto ju už nemusí schvaľovať. Môžete ju rovno stiahnuť a poslať dodávateľovi.</p>`);
   } else if (status === 'zamietnuta' && isCreator) {
     el('ap-rejected-info').classList.remove('hidden');
     el('ap-rejected-note-text').textContent = 'Zamietnuté: ' + (order.rejection_note||'bez komentára');
