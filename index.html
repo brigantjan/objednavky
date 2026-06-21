@@ -413,7 +413,7 @@ td.total-cell{text-align:right;font-weight:600;white-space:nowrap;}
             <thead><tr id="items-head"></tr></thead>
             <tbody id="items-body"></tbody>
             <tfoot><tr class="items-total-row" id="items-total-row">
-              <td id="items-total-lbl" colspan="4">CELKEM</td>
+              <td id="items-total-lbl" colspan="4">CELKOM</td>
               <td id="items-total-val">0,00 €</td>
               <td></td>
             </tr></tfoot>
@@ -855,11 +855,11 @@ async function openOrder(order) {
 
   const it = el('view-items');
   if (tpl.show_quantity_columns) {
-    it.innerHTML = `<thead><tr><th>Počet</th><th>Jedn.</th><th>Popis</th><th>Cena/jedn.</th><th>CELKEM</th></tr></thead><tbody>`
+    it.innerHTML = `<thead><tr><th>Počet</th><th>Jedn.</th><th>Popis</th><th>Cena/jedn.</th><th>CELKOM</th></tr></thead><tbody>`
       + S.viewItems.map(i=>`<tr><td>${i.quantity??''}</td><td>${esc(i.unit||'')}</td><td>${esc(i.description)}</td>
         <td class="total-cell">${i.unit_price!=null?fmt(i.unit_price):''}</td>
         <td class="total-cell">${i.line_total!=null?fmt(i.line_total):''}</td></tr>`).join('')
-      + `<tr class="items-total-row"><td colspan="4">CELKEM</td><td class="total-cell">${fmt(order.total_amount)}</td></tr></tbody>`;
+      + `<tr class="items-total-row"><td colspan="4">CELKOM</td><td class="total-cell">${fmt(order.total_amount)}</td></tr></tbody>`;
   } else {
     it.innerHTML = `<thead><tr><th>Popis</th></tr></thead><tbody>`
       + S.viewItems.map(i=>`<tr><td>${esc(i.description)}</td></tr>`).join('') + '</tbody>';
@@ -936,6 +936,7 @@ function cloneOrder(order, items) {
 
   buildItemsHead(tpl||{});
   el('order-date').value = today();
+  syncDeliveryDateMin();
   el('intro-text').value = order.intro_text||'';
   el('billing-note').value = order.billing_note||'';
   el('attachment-note').value = order.attachment_note||'';
@@ -1026,6 +1027,7 @@ function buildForm(tpl) {
   tpl.default_attachment ? el('attachment-note-wrap').classList.remove('hidden') : el('attachment-note-wrap').classList.add('hidden');
   el('attachment-note').value=tpl.default_attachment||'';
   el('order-date').value=today();
+  syncDeliveryDateMin();
   el('delivery-date').value='';
   buildItemsHead(tpl);
   el('items-body').innerHTML='';
@@ -1035,7 +1037,7 @@ function buildForm(tpl) {
 function buildItemsHead(tpl) {
   const h=el('items-head');
   if (tpl.show_quantity_columns) {
-    h.innerHTML='<th style="width:80px">Počet</th><th style="width:70px">Jedn.</th><th>Popis</th><th style="width:110px">Cena/jedn.</th><th style="width:100px">CELKEM</th><th style="width:28px"></th>';
+    h.innerHTML='<th style="width:80px">Počet</th><th style="width:70px">Jedn.</th><th>Popis</th><th style="width:110px">Cena/jedn.</th><th style="width:100px">CELKOM</th><th style="width:28px"></th>';
     el('items-total-row').classList.remove('hidden');
   } else {
     h.innerHTML='<th>Popis</th><th style="width:28px"></th>';
@@ -1104,6 +1106,22 @@ el('new-supplier-toggle').addEventListener('change',e=>{
   if(e.target.checked){el('new-supplier-fields').classList.remove('hidden');el('supplier-input').disabled=true;el('supplier-input').value='';}
   else{el('new-supplier-fields').classList.add('hidden');el('supplier-input').disabled=false;}
 });
+
+// Dátum dodania nesmie byť skorší ako dátum vystavenia - dynamicky
+// nastavujeme min atribút na poli, aby sa to nedalo vybrať ani v kalendári.
+function syncDeliveryDateMin() {
+  const od = el('order-date').value;
+  if (od) {
+    el('delivery-date').min = od;
+    // ak je už vyplnený nesprávny dátum dodania, vyčisti ho a upozorni
+    if (el('delivery-date').value && el('delivery-date').value < od) {
+      el('delivery-date').value = '';
+      setErr('err-delivery-date', 'Dátum dodania bol vynulovaný, lebo bol skorší ako nový dátum vystavenia.');
+    }
+  }
+}
+el('order-date').addEventListener('change', syncDeliveryDateMin);
+el('order-date').addEventListener('input', syncDeliveryDateMin);
 
 // ── SUBMIT ───────────────────────────────────────────────────────────────
 el('order-form').addEventListener('submit', async e => {
@@ -1360,7 +1378,7 @@ async function buildXlsx(order, items) {
     SC(r,4,'Počet',{bold:true,b:true,h:'center'}); SC(r,5,'Jedn.',{bold:true,b:true,h:'center'});
     M(r,6,r,13); SC(r,6,'Popis',{bold:true,b:true,h:'center'});
     M(r,14,r,16); SC(r,14,'Cena za jedn.',{bold:true,b:true,h:'center'});
-    SC(r,17,'CELKEM',{bold:true,b:true,h:'center'});
+    SC(r,17,'CELKOM',{bold:true,b:true,h:'center'});
   } else {
     M(r,4,r,17); SC(r,4,'Popis',{bold:true,b:true,h:'center'});
   }
@@ -1431,10 +1449,10 @@ async function buildXlsx(order, items) {
     } else { M(r,4,r,17); SC(r,4,'Prílohy: '+order.attachment_note); }
   }
 
-  // CELKEM
+  // CELKOM
   if(tpl.show_quantity_columns){
     r+=1; ws.getRow(r).height=16;
-    M(r,14,r,16); SC(r,14,'CELKEM',{bold:true,h:'right',f:'FFD9D9D9'});
+    M(r,14,r,16); SC(r,14,'CELKOM',{bold:true,h:'right',f:'FFD9D9D9'});
     SC(r,17,Number(order.total_amount),{bold:true,h:'right',b:true,f:'FFD9D9D9',n:'#,##0.00 €'});
   }
 
@@ -1587,7 +1605,7 @@ async function printOrder(order, items) {
     iHtml=`<table class="pi"><thead><tr>
       <th style="width:60px">Počet</th><th style="width:50px">Jedn.</th>
       <th>Popis</th><th style="width:110px;text-align:right">Cena za jedn.</th>
-      <th style="width:90px;text-align:right">CELKEM</th></tr></thead><tbody>`
+      <th style="width:90px;text-align:right">CELKOM</th></tr></thead><tbody>`
       +items.map(it=>`<tr>
         <td style="text-align:right">${it.quantity??''}</td>
         <td style="text-align:center">${esc(it.unit||'')}</td>
@@ -1595,7 +1613,7 @@ async function printOrder(order, items) {
         <td style="text-align:right">${it.unit_price!=null?fmt(it.unit_price):''}</td>
         <td style="text-align:right;font-weight:600">${it.line_total!=null?fmt(it.line_total):''}</td></tr>`).join('')
       +`<tr style="background:#d9d9d9;font-weight:bold">
-        <td colspan="4" style="text-align:right">CELKEM</td>
+        <td colspan="4" style="text-align:right">CELKOM</td>
         <td style="text-align:right">${fmt(order.total_amount)}</td></tr></tbody></table>`;
   } else {
     iHtml=`<table class="pi"><thead><tr><th>Popis</th></tr></thead><tbody>`
@@ -1736,10 +1754,12 @@ function startEdit(order, items) {
     .forEach(id=>setErr(id,''));
 
   el('order-date').value = order.order_date||today();
+  syncDeliveryDateMin();
   el('intro-text').value = order.intro_text||'';
   el('billing-note').value = order.billing_note||'';
   el('attachment-note').value = order.attachment_note||'';
   el('delivery-date').value = order.delivery_date||'';
+  el('delivery-date').min = order.order_date||today();
   el('doprava').value = order.doprava||'';
   el('sprava').value = order.sprava||'';
   el('note').value = order.note||'';
