@@ -715,13 +715,32 @@ async function renderDashboard() {
 
   // Štatistiky - 4 kľúčové dlaždice
   const thisMonth = new Date().toISOString().slice(0,7);
-  const monthApprovedMine = myOrders.filter(o => o.status==='schvalena' && (o.updated_at||o.order_date||'').startsWith(thisMonth));
+
+  // "Schválené tento mesiac" závisí od roly:
+  //   - Vystavovateľ (level 0): len tie, ktoré on sám vystavil
+  //   - Vedúci (level 1): všetky za jeho stredisko
+  //   - Riaditeľ (level 2): všetky objednávky v systéme
+  const myStredisko = S.profile.stredisko;
+  let monthApproved, monthApprovedFilter, monthApprovedLabel;
+  if (myLevel === 2) {
+    monthApproved = S.orders.filter(o => o.status==='schvalena' && (o.updated_at||o.order_date||'').startsWith(thisMonth));
+    monthApprovedFilter = {status:'schvalena', month:thisMonth};
+    monthApprovedLabel = 'Schválené tento mesiac (celá firma)';
+  } else if (myLevel === 1) {
+    monthApproved = S.orders.filter(o => o.status==='schvalena' && (o.updated_at||o.order_date||'').startsWith(thisMonth) && o.stredisko === myStredisko);
+    monthApprovedFilter = {status:'schvalena', month:thisMonth, stredisko:myStredisko};
+    monthApprovedLabel = 'Schválené tento mesiac (stredisko ' + myStredisko + ')';
+  } else {
+    monthApproved = myOrders.filter(o => o.status==='schvalena' && (o.updated_at||o.order_date||'').startsWith(thisMonth));
+    monthApprovedFilter = {createdBy:myId, status:'schvalena'};
+    monthApprovedLabel = 'Moje schválené tento mesiac';
+  }
 
   const stats = [
     {label:'Čaká na moje schválenie', value:waitingForMe.length, icon:'ti-clock', tone:'warning', filter:{pendingApproverId:myId}},
     {label:'Vrátené mi na opravu', value:returnedToMe.length, icon:'ti-arrow-back-up', tone:'danger', filter:{createdBy:myId, status:'vystavena', onlyReturned:true}},
     {label:'Moje rozpracované', value:draftMine.length, icon:'ti-file-text', tone:'neutral', filter:{createdBy:myId, status:'vystavena', onlyDraft:true}},
-    {label:'Schválené tento mesiac', value:monthApprovedMine.length, icon:'ti-check', tone:'success', filter:{createdBy:myId, status:'schvalena'}},
+    {label:monthApprovedLabel, value:monthApproved.length, icon:'ti-check', tone:'success', filter:monthApprovedFilter},
   ];
   const TONE_STYLES = {
     warning: {bg:'#fdf3e7', fg:'#b9650f'},
@@ -2391,6 +2410,10 @@ function openReportsWithFilter(filter) {
     if (filter.status) el('rf-status').value = filter.status;
     if (filter.statusIn) S.reportStatusIn = filter.statusIn;
     if (filter.month) { el('rf-date-from').value = filter.month+'-01'; el('rf-date-to').value = filter.month+'-31'; }
+    if (filter.stredisko) {
+      // Vyber správne stredisko v multiselect
+      [...el('rf-stredisko').options].forEach(o => { o.selected = o.value === filter.stredisko; });
+    }
     if (filter.ids) S.reportCustomIds = filter.ids;
     if (filter.pendingApproverId) S.reportPendingApprover = filter.pendingApproverId;
     if (filter.onlyReturned) S.reportOnlyReturned = true;
