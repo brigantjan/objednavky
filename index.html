@@ -563,6 +563,14 @@ const esc = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replac
 const fmt = v => (Number(v)||0).toLocaleString('sk-SK',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
 const today = () => new Date().toISOString().slice(0,10);
 const fmtD = d => d ? d.slice(0,10).split('-').reverse().join('.') : '';
+const fmtDateTime = ts => {
+  if (!ts) return '';
+  const d = new Date(ts); // Supabase timestamp je v UTC, Date ho automaticky prevedie na lokálny čas prehliadača
+  if (isNaN(d)) return fmtD(ts.slice(0,10));
+  const datePart = String(d.getDate()).padStart(2,'0') + '.' + String(d.getMonth()+1).padStart(2,'0') + '.' + d.getFullYear();
+  const timePart = String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+  return datePart + ' ' + timePart;
+};
 const setErr = (id,m) => { const e=el(id); if(e) e.textContent=m||''; };
 
 // ── LOGIN ──────────────────────────────────────────────────────────────
@@ -1314,8 +1322,8 @@ async function buildXlsx(order, items) {
     for (const h of approvalHist) {
       const approver = S.profiles.find(p=>p.id===h.approver_id);
       const sig = (sigs||[]).find(s=>s.profile_id===h.approver_id);
-      if (h.level===1) { sigL1Data=sig?.signature_b64||null; sigL1Name=approver?.full_name||''; sigL1Date=fmtD(h.approved_at?.slice(0,10)); }
-      if (h.level===2) { sigL2Data=sig?.signature_b64||null; sigL2Name=approver?.full_name||''; sigL2Date=fmtD(h.approved_at?.slice(0,10)); }
+      if (h.level===1) { sigL1Data=sig?.signature_b64||null; sigL1Name=approver?.full_name||''; sigL1Date=fmtDateTime(h.approved_at); }
+      if (h.level===2) { sigL2Data=sig?.signature_b64||null; sigL2Name=approver?.full_name||''; sigL2Date=fmtDateTime(h.approved_at); }
     }
   }
   if (order.status === 'schvalena') {
@@ -1604,8 +1612,8 @@ async function printOrder(order, items) {
     for (const h of hist) {
       const approver = S.profiles.find(p=>p.id===h.approver_id);
       const sig = (sigs||[]).find(s=>s.profile_id===h.approver_id);
-      const sigImg = sig ? `<img src="data:image/png;base64,${sig.signature_b64}" style="max-height:70px;max-width:245px;display:block;margin-bottom:2px;"/>` : '';
-      const block = `${sigImg}<p style="font-size:10px;margin-top:2px;">${esc(approver?.full_name||'')}<br/>${fmtD(h.approved_at?.slice(0,10))}</p>`;
+      const sigImg = sig ? `<img src="data:image/png;base64,${sig.signature_b64}" style="max-height:91px;max-width:318px;display:block;margin-bottom:2px;filter:saturate(3) brightness(0.85) hue-rotate(190deg) contrast(1.3);mix-blend-mode:multiply;"/>` : '';
+      const block = `${sigImg}<p style="font-size:10px;margin-top:2px;">${esc(approver?.full_name||'')}<br/>${fmtDateTime(h.approved_at)}</p>`;
       if (h.level===1) sigL1Html = block;
       if (h.level===2) sigL2Html = block;
     }
@@ -1615,7 +1623,7 @@ async function printOrder(order, items) {
     const {data:stamp} = await supabaseClient.from('company_stamps')
       .select('*').eq('company_code', order.company_code).maybeSingle();
     if (stamp) {
-      stampHtml = `<img src="data:image/png;base64,${stamp.stamp_b64}" style="max-height:122px;max-width:210px;position:absolute;right:10px;bottom:6px;opacity:0.92;"/>`;
+      stampHtml = `<img src="data:image/png;base64,${stamp.stamp_b64}" style="max-height:122px;max-width:210px;position:absolute;right:10px;bottom:6px;opacity:0.95;filter:contrast(1.6) brightness(0.75) saturate(1.2);mix-blend-mode:multiply;"/>`;
     }
   }
 
@@ -1668,7 +1676,7 @@ body{font-family:Calibri,Arial,sans-serif;font-size:11px;padding:12mm 15mm;displ
 .info-box{border:1px solid #000;padding:6px;font-size:10px;line-height:1.7;}
 .sep{border-top:2px solid #000;margin:8px 0 4px;}
 .appr{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:4px;}
-.appr-box{border:1px solid #000;min-height:130px;padding:5px;font-size:10px;position:relative;overflow:visible;}
+.appr-box{border:1px solid #000;min-height:155px;padding:5px;font-size:10px;position:relative;overflow:visible;}
 .appr-box h4{font-weight:bold;margin-bottom:3px;}
 .notes-box{border:1px solid #000;min-height:30px;padding:5px;margin-top:5px;font-size:10px;}
 @media print{@page{size:A4;margin:10mm 15mm;} body{padding:0;min-height:277mm;}}
@@ -1883,7 +1891,7 @@ async function loadApprovalPanel(order) {
                          : '✗ Zamietnuté';
       histDiv.innerHTML += `<div style="font-size:12px;margin-top:4px;padding:6px;background:#f8f9fa;border-radius:4px;">
         <strong>${actionLabel}</strong> – Úroveň ${h.level}
-        – ${approver?.full_name||'?'} – ${fmtD(h.approved_at.slice(0,10))}
+        – ${approver?.full_name||'?'} – ${fmtDateTime(h.approved_at)}
         ${h.note?`<br/><em style="color:var(--muted)">${esc(h.note)}</em>`:''}
       </div>`;
     });
