@@ -145,6 +145,12 @@ td.total-cell{text-align:right;font-weight:600;white-space:nowrap;}
         <!-- Štatistiky -->
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:22px;" id="dash-stats"></div>
 
+        <!-- Prehľad podľa stredísk (len pre riaditeľa L2) -->
+        <div id="dash-stredisko-overview" class="hidden" style="margin-bottom:24px;">
+          <p style="font-size:13px;font-weight:600;color:var(--muted);margin-bottom:10px;">Prehľad podľa stredísk</p>
+          <div id="dash-stredisko-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;"></div>
+        </div>
+
         <!-- Jednotný zoznam úloh -->
         <div style="border-top:1px solid var(--color-border-tertiary,var(--border));padding-top:14px;">
           <p id="dash-attention-title" style="font-size:13px;font-weight:600;color:var(--muted);margin-bottom:8px;">Vyžaduje vašu pozornosť</p>
@@ -236,11 +242,37 @@ td.total-cell{text-align:right;font-weight:600;white-space:nowrap;}
             <button class="secondary" id="view-excel-btn">⬇ Excel</button>
             <button class="secondary" id="view-print-btn">🖨 Tlač / PDF</button>
             <button class="secondary" id="view-edit-btn">✏️ Editovať</button>
+            <button class="secondary hidden" id="view-fix-supplier-btn">🏢 Opraviť dodávateľa</button>
             <button id="view-clone-btn">📋 Použiť ako šablónu</button>
           </div>
         </div>
         <div class="detail-grid" id="view-grid"></div>
         <table class="items" id="view-items" style="margin-top:10px;"></table>
+
+        <!-- Formulár opravy dodávateľa (len pre admina/riaditeľa) -->
+        <div id="fix-supplier-form" class="hidden" style="border:1px solid var(--border);border-radius:var(--radius);padding:16px;background:#fafbfc;margin-top:12px;">
+          <h3 style="margin:0 0 10px;">Opraviť údaje dodávateľa na tejto objednávke</h3>
+          <p style="color:var(--muted);font-size:12px;margin-bottom:12px;">
+            Zmena sa uloží na tejto objednávke a zároveň aktualizuje centrálny číselník dodávateľov
+            (ak je objednávka napojená na konkrétny záznam), aby sa chyba neopakovala nabudúce.
+          </p>
+          <div class="form-grid">
+            <div><label>Názov *</label><input id="fs-name"/></div>
+            <div><label>IČO *</label><input id="fs-ico"/></div>
+            <div><label>Adresa *</label><input id="fs-address"/></div>
+            <div><label>PSČ</label><input id="fs-zip"/></div>
+            <div><label>Mesto *</label><input id="fs-city"/></div>
+            <div><label>DIČ</label><input id="fs-dic"/></div>
+            <div><label>Kontaktná osoba</label><input id="fs-contact"/></div>
+            <div><label>Telefón</label><input id="fs-phone"/></div>
+            <div><label>Email</label><input id="fs-email"/></div>
+          </div>
+          <div class="field-error" id="fs-error"></div>
+          <div style="display:flex;gap:8px;margin-top:12px;">
+            <button id="fs-save-btn">💾 Uložiť opravu</button>
+            <button class="secondary" id="fs-cancel-btn">Zrušiť</button>
+          </div>
+        </div>
 
         <!-- Schvaľovací panel -->
         <div id="approval-panel" class="hidden" style="margin-top:16px;border-top:1px solid var(--border);padding-top:16px;">
@@ -482,7 +514,17 @@ td.total-cell{text-align:right;font-weight:600;white-space:nowrap;}
               <input type="password" id="af-password" placeholder="Pri editácii nechajte prázdne ak nemeníte"/>
             </div>
             <div><label>Iniciály * (napr. JB)</label><input id="af-initials" maxlength="5" style="text-transform:uppercase;"/></div>
-            <div><label>Stredisko</label><input id="af-stredisko" placeholder="ZA"/></div>
+            <div><label>Stredisko *</label>
+              <select id="af-stredisko">
+                <option value="">— vyberte —</option>
+                <option value="ZA5">ZA5</option>
+                <option value="TN3">TN3</option>
+                <option value="TO3">TO3</option>
+                <option value="SE3">SE3</option>
+                <option value="BA2">BA2</option>
+                <option value="BA4">BA4</option>
+              </select>
+            </div>
             <div><label>Telefón</label><input id="af-phone" placeholder="+421 9xx xxx xxx"/></div>
             <div>
               <label>Oprávnenie na firmy *</label>
@@ -529,6 +571,43 @@ td.total-cell{text-align:right;font-weight:600;white-space:nowrap;}
             Pečiatka sa vloží do PDF/Excelu pri PLNOM schválení objednávky (po 2. úrovni).
           </p>
           <div id="admin-stamps-list"></div>
+        </div>
+
+        <!-- ČÍSELNÍK DODÁVATEĽOV -->
+        <div style="margin-top:30px;border-top:1px solid var(--border);padding-top:20px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <h3 style="margin:0;">🏢 Číselník dodávateľov</h3>
+            <button id="admin-supplier-add-btn" style="font-size:12px;padding:6px 12px;">+ Nový dodávateľ</button>
+          </div>
+          <p style="color:var(--muted);font-size:13px;margin-bottom:14px;">
+            Spravujte databázu dodávateľov bez nutnosti vystavovať objednávku.
+          </p>
+          <input id="admin-supplier-search" placeholder="Hľadať podľa názvu alebo IČO..." style="margin-bottom:10px;"/>
+          <div id="admin-suppliers-list"></div>
+
+          <div id="admin-supplier-form-wrap" class="hidden" style="border:1px solid var(--border);border-radius:var(--radius);padding:16px;background:#fafbfc;margin-top:12px;">
+            <h4 id="admin-supplier-form-title" style="margin:0 0 12px;">Nový dodávateľ</h4>
+            <div class="form-grid">
+              <div><label>Názov *</label><input id="asf-name"/></div>
+              <div><label>IČO *</label><input id="asf-ico"/></div>
+              <div><label>Adresa *</label><input id="asf-address"/></div>
+              <div><label>PSČ</label><input id="asf-zip"/></div>
+              <div><label>Mesto *</label><input id="asf-city"/></div>
+              <div><label>DIČ</label><input id="asf-dic"/></div>
+              <div><label>Kontaktná osoba</label><input id="asf-contact"/></div>
+              <div><label>Telefón</label><input id="asf-phone"/></div>
+              <div><label>Email</label><input id="asf-email"/></div>
+              <div style="display:flex;align-items:center;gap:8px;padding-top:20px;">
+                <input type="checkbox" id="asf-is-active" style="width:auto;" checked/>
+                <label for="asf-is-active" style="margin:0;color:var(--text);font-weight:400;">Aktívny (zobrazí sa vo výbere)</label>
+              </div>
+            </div>
+            <div class="field-error" id="admin-supplier-error"></div>
+            <div style="display:flex;gap:8px;margin-top:14px;">
+              <button id="asf-save-btn">💾 Uložiť</button>
+              <button class="secondary" id="asf-cancel-btn">Zrušiť</button>
+            </div>
+          </div>
         </div>
       </section>
     </div>
@@ -709,6 +788,38 @@ async function renderDashboard() {
   const waitingForMe    = S.orders.filter(o => o.pending_approver_id === myId && (o.status==='caka_L1'||o.status==='caka_L2'));
   const returnedToMe    = myOrders.filter(o => o.status === 'vystavena' && o.rejection_note);
   const draftMine       = myOrders.filter(o => o.status === 'vystavena' && !o.rejection_note);
+
+  // ── Prehľad podľa stredísk - len pre riaditeľa (L2), ktorému chodia
+  // objednávky zo všetkých stredísk súčasne. Pre ostatných sa táto
+  // sekcia skryje.
+  if (myLevel === 2) {
+    const STREDISKA = ['ZA5','TN3','TO3','SE3','BA2','BA4'];
+    // Vrátenia, ktoré urobil TENTO riaditeľ (level=2, action=vratene)
+    const {data: myReturns} = await supabaseClient.from('approvals')
+      .select('order_id').eq('approver_id', myId).eq('level', 2).eq('action','vratene');
+    const myReturnedOrderIds = new Set((myReturns||[]).map(a=>a.order_id));
+
+    el('dash-stredisko-overview').classList.remove('hidden');
+    el('dash-stredisko-grid').innerHTML = STREDISKA.map(str => {
+      const all = S.orders.filter(o => o.stredisko === str);
+      const cakaNaMna = all.filter(o => o.status==='caka_L2' && o.pending_approver_id===myId).length;
+      const schvalenaL1 = all.filter(o => o.status==='schvalena_L1').length;
+      const schvalene = all.filter(o => o.status==='schvalena').length;
+      const vratene = all.filter(o => myReturnedOrderIds.has(o.id)).length;
+      return `<div style="background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;cursor:pointer;"
+           onclick="window.__openStrediskoFilter('${str}')">
+        <div style="font-weight:700;font-size:14px;margin-bottom:6px;">${str}</div>
+        <div style="font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:3px;">
+          <span><strong style="color:#e67e22;">${cakaNaMna}</strong> čaká na schválenie</span>
+          <span><strong style="color:#2563a8;">${schvalenaL1}</strong> schválené L1 (čaká vedúci pošle)</span>
+          <span><strong style="color:#1e7e34;">${schvalene}</strong> plne schválené</span>
+          <span><strong style="color:#c0392b;">${vratene}</strong> mnou vrátené na opravu</span>
+        </div>
+      </div>`;
+    }).join('');
+  } else {
+    el('dash-stredisko-overview').classList.add('hidden');
+  }
   // Moje vlastné objednávky, ktoré som si AUTOMATICKY schválil vystavením (som vedúci/riaditeľ)
   // a ešte čakajú na MOJU akciu - poslať ďalej riaditeľovi (len pre vedúceho, status schvalena_L1, nikto iný ich nemá rozpracované)
   const needForwardMine  = myOrders.filter(o => o.status === 'schvalena_L1' && !o.pending_approver_id);
@@ -835,6 +946,10 @@ window.__openStatFilter = function(i) {
   openReportsWithFilter(f);
 };
 
+window.__openStrediskoFilter = function(stredisko) {
+  openReportsWithFilter({stredisko});
+};
+
 el('new-order-btn').addEventListener('click', () => {
   S.viewOrder = null; S.cloneData = null;
   showStep('step-company');
@@ -895,7 +1010,70 @@ async function openOrder(order) {
   renderStatusBadge(order.status||'vystavena');
   await loadApprovalPanel(order);
   await loadChat(order.id);
+
+  // Tlačidlo "Opraviť dodávateľa" - len pre adminov (vrátane riaditeľov L2,
+  // ktorí majú is_admin automaticky nastavené)
+  el('view-fix-supplier-btn').classList.toggle('hidden', !S.profile.is_admin);
+  el('fix-supplier-form').classList.add('hidden');
 }
+
+// ── OPRAVA DODÁVATEĽA NA OBJEDNÁVKE (admin / riaditeľ) ──────────────────────
+el('view-fix-supplier-btn').addEventListener('click', () => {
+  const sup = S.viewOrder.supplier_snapshot || {};
+  el('fs-name').value = sup.name || '';
+  el('fs-ico').value = sup.ico || '';
+  el('fs-address').value = sup.address || '';
+  el('fs-zip').value = sup.zip || '';
+  el('fs-city').value = sup.city || '';
+  el('fs-dic').value = sup.dic || '';
+  el('fs-contact').value = sup.contact_person || '';
+  el('fs-phone').value = sup.phone || '';
+  el('fs-email').value = sup.email || '';
+  el('fs-error').textContent = '';
+  el('fix-supplier-form').classList.remove('hidden');
+  el('fix-supplier-form').scrollIntoView({behavior:'smooth'});
+});
+
+el('fs-cancel-btn').addEventListener('click', () => {
+  el('fix-supplier-form').classList.add('hidden');
+});
+
+el('fs-save-btn').addEventListener('click', async () => {
+  el('fs-error').textContent = '';
+  const name = el('fs-name').value.trim();
+  const ico = el('fs-ico').value.trim();
+  const address = el('fs-address').value.trim();
+  const city = el('fs-city').value.trim();
+
+  if (!name || !ico || !address || !city) {
+    el('fs-error').textContent = 'Vyplňte aspoň Názov, IČO, Adresu a Mesto.';
+    return;
+  }
+
+  const supplierData = {
+    name, ico, address, city,
+    zip: el('fs-zip').value.trim() || null,
+    dic: el('fs-dic').value.trim() || null,
+    contact_person: el('fs-contact').value.trim() || null,
+    phone: el('fs-phone').value.trim() || null,
+    email: el('fs-email').value.trim() || null,
+  };
+
+  el('fs-save-btn').disabled = true;
+  const {data, error} = await supabaseClient.rpc('fix_supplier_on_order', {
+    p_order_id: S.viewOrder.id,
+    p_supplier_data: supplierData
+  });
+  el('fs-save-btn').disabled = false;
+
+  if (error) { el('fs-error').textContent = 'Chyba: ' + error.message; return; }
+
+  S.viewOrder.supplier_snapshot = supplierData;
+  S.orders = S.orders.map(o=>o.id===S.viewOrder.id?{...o,supplier_snapshot:supplierData}:o);
+  el('fix-supplier-form').classList.add('hidden');
+  await openOrder(S.viewOrder);
+  alert('Údaje dodávateľa boli opravené na objednávke aj v centrálnom číselníku.');
+});
 
 // ── CHAT / KOMENTÁRE K OBJEDNÁVKE ───────────────────────────────────────────
 async function loadChat(orderId) {
@@ -2198,6 +2376,7 @@ el('admin-btn').addEventListener('click', async () => {
   buildCompanyCheckboxes(null);
   await renderSignaturesAdmin();
   await renderStampsAdmin();
+  await renderSuppliersAdmin();
 });
 
 async function loadAdminUserList() {
@@ -2231,7 +2410,7 @@ async function loadAdminUserList() {
           <td style="padding:6px 8px;border:1px solid var(--border);">${esc(u.full_name)}${u.is_admin?' <span style="font-size:10px;background:#1f5fa8;color:#fff;padding:1px 5px;border-radius:3px;">admin</span>':''}</td>
           <td style="padding:6px 8px;border:1px solid var(--border);">${esc(u.email||'')}</td>
           <td style="padding:6px 8px;border:1px solid var(--border);font-weight:700;">${esc(u.initials)}</td>
-          <td style="padding:6px 8px;border:1px solid var(--border);">${esc(u.stredisko)}</td>
+          <td style="padding:6px 8px;border:1px solid var(--border);">${esc(u.stredisko_kod||u.stredisko||'—')}</td>
           <td style="padding:6px 8px;border:1px solid var(--border);">${(u.allowed_company_codes||[]).join(', ')}</td>
           <td style="padding:6px 8px;border:1px solid var(--border);">${LEVEL_LABELS[u.approval_level||0]}</td>
           <td style="padding:6px 8px;border:1px solid var(--border);">
@@ -2239,6 +2418,7 @@ async function loadAdminUserList() {
           </td>
           <td style="padding:6px 8px;border:1px solid var(--border);white-space:nowrap;">
             <button class="secondary" style="font-size:12px;padding:4px 8px;" onclick="openEditUser('${u.id}')">✏️ Editovať</button>
+            <button class="secondary" style="font-size:12px;padding:4px 8px;margin-left:4px;" onclick="openOrderCounter('${u.id}','${esc(u.full_name)}')">🔢 Číslovanie</button>
           </td>
         </tr>`).join('')}
       </tbody>
@@ -2270,7 +2450,7 @@ el('admin-add-btn').addEventListener('click', () => {
   el('af-email').value = '';
   el('af-password').value = '';
   el('af-initials').value = '';
-  el('af-stredisko').value = 'ZA';
+  el('af-stredisko').value = '';
   el('af-phone').value = '';
   el('af-approval-level').value = '0';
   el('af-is-admin').checked = false;
@@ -2282,6 +2462,27 @@ el('admin-add-btn').addEventListener('click', () => {
   el('admin-form-wrap').scrollIntoView({behavior:'smooth'});
 });
 
+window.openOrderCounter = async function(userId, fullName) {
+  const year = new Date().getFullYear();
+  const result = await callManageUsers({ action: 'get_order_counter', user_id: userId, year });
+  const current = result.ok ? (result.last_number || 0) : 0;
+
+  const input = prompt(
+    `Posledné použité poradové číslo pre ${fullName} (rok ${year}).\n` +
+    `Aktuálna hodnota: ${current}\n\n` +
+    `Zadajte poslednú reálne použitú objednávku (ďalšia vystavená dostane o 1 viac):`,
+    String(current)
+  );
+  if (input === null) return; // zrušené
+
+  const num = parseInt(input.trim());
+  if (isNaN(num) || num < 0) { alert('Zadajte platné nezáporné číslo.'); return; }
+
+  const setResult = await callManageUsers({ action: 'set_order_counter', user_id: userId, year, last_number: num });
+  if (!setResult.ok) { alert('Chyba: ' + setResult.error); return; }
+  alert(setResult.message || 'Počítadlo nastavené.');
+};
+
 window.openEditUser = function(userId) {
   const u = (S.adminUsers||[]).find(x=>x.id===userId);
   if (!u) return;
@@ -2291,7 +2492,7 @@ window.openEditUser = function(userId) {
   el('af-email').value = u.email||'';
   el('af-password').value = '';
   el('af-initials').value = u.initials;
-  el('af-stredisko').value = u.stredisko;
+  el('af-stredisko').value = u.stredisko_kod || '';
   el('af-phone').value = u.phone||'';
   el('af-approval-level').value = String(u.approval_level||0);
   el('af-is-admin').checked = !!u.is_admin;
@@ -2314,7 +2515,7 @@ el('af-save-btn').addEventListener('click', async () => {
   const email   = el('af-email').value.trim();
   const pass    = el('af-password').value;
   const init    = el('af-initials').value.trim().toUpperCase();
-  const stred   = el('af-stredisko').value.trim() || 'ZA';
+  const stredKod = el('af-stredisko').value;
   const phone   = el('af-phone').value.trim();
   const level   = parseInt(el('af-approval-level').value);
   const isAdmin = el('af-is-admin').checked;
@@ -2323,6 +2524,10 @@ el('af-save-btn').addEventListener('click', async () => {
 
   if (!name || !email || !init) {
     el('admin-error').textContent = 'Vyplňte aspoň Meno, Email a Iniciály.';
+    el('admin-error').classList.remove('hidden'); return;
+  }
+  if (!stredKod) {
+    el('admin-error').textContent = 'Vyberte stredisko.';
     el('admin-error').classList.remove('hidden'); return;
   }
   if (codes.length === 0) {
@@ -2341,11 +2546,11 @@ el('af-save-btn').addEventListener('click', async () => {
   el('af-save-btn').disabled = true;
   const payload = S.editingUserId
     ? { action:'update', user_id:S.editingUserId, email, full_name:name,
-        initials:init, stredisko:stred, phone, allowed_company_codes:codes,
+        initials:init, stredisko:stredKod, stredisko_kod:stredKod, phone, allowed_company_codes:codes,
         approval_level:level, is_admin:isAdmin, is_active:isAct,
         ...(pass ? {password:pass} : {}) }
     : { action:'create', email, password:pass, full_name:name,
-        initials:init, stredisko:stred, phone, allowed_company_codes:codes,
+        initials:init, stredisko:stredKod, stredisko_kod:stredKod, phone, allowed_company_codes:codes,
         approval_level:level, is_admin:isAdmin };
 
   const result = await callManageUsers(payload);
@@ -2653,6 +2858,139 @@ window.__uploadStamp = async function(companyCode, file) {
     alert('Chyba pri spracovaní súboru: ' + e.message);
   }
 };
+
+// ── ČÍSELNÍK DODÁVATEĽOV (admin) ────────────────────────────────────────────
+S.editingSupplierId = null;
+
+async function renderSuppliersAdmin(filterText) {
+  const q = (filterText||'').toLowerCase().trim();
+  const {data: suppliers, error} = await supabaseClient.from('suppliers').select('*').order('name');
+  if (error) {
+    el('admin-suppliers-list').innerHTML = '<p style="color:var(--error);font-size:13px;">Chyba pri načítaní: '+esc(error.message)+'</p>';
+    return;
+  }
+  S.allSuppliers = suppliers || [];
+  const filtered = S.allSuppliers.filter(s => !q || s.name.toLowerCase().includes(q) || (s.ico||'').includes(q));
+
+  if (!filtered.length) {
+    el('admin-suppliers-list').innerHTML = '<p style="color:var(--muted);font-size:13px;">Žiadni dodávatelia</p>';
+    return;
+  }
+
+  el('admin-suppliers-list').innerHTML = `
+    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead><tr style="background:#f0f3f7;">
+        <th style="padding:6px 8px;text-align:left;border:1px solid var(--border);">Názov</th>
+        <th style="padding:6px 8px;text-align:left;border:1px solid var(--border);">IČO</th>
+        <th style="padding:6px 8px;text-align:left;border:1px solid var(--border);">Mesto</th>
+        <th style="padding:6px 8px;text-align:left;border:1px solid var(--border);">Kontakt</th>
+        <th style="padding:6px 8px;text-align:left;border:1px solid var(--border);">Stav</th>
+        <th style="padding:6px 8px;border:1px solid var(--border);">Akcie</th>
+      </tr></thead>
+      <tbody>
+        ${filtered.map(s=>`<tr style="border-bottom:1px solid var(--border);${!s.is_active?'opacity:0.5;':''}">
+          <td style="padding:6px 8px;border:1px solid var(--border);font-weight:600;">${esc(s.name)}</td>
+          <td style="padding:6px 8px;border:1px solid var(--border);">${esc(s.ico||'')}</td>
+          <td style="padding:6px 8px;border:1px solid var(--border);">${esc(s.city||'')}</td>
+          <td style="padding:6px 8px;border:1px solid var(--border);">${esc(s.contact_person||'')}</td>
+          <td style="padding:6px 8px;border:1px solid var(--border);">${s.is_active?'Aktívny':'Neaktívny'}</td>
+          <td style="padding:6px 8px;border:1px solid var(--border);white-space:nowrap;">
+            <button class="secondary" style="font-size:12px;padding:4px 8px;" onclick="window.__openEditSupplier('${s.id}')">✏️ Editovať</button>
+          </td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+el('admin-supplier-search').addEventListener('input', e => renderSuppliersAdmin(e.target.value));
+
+el('admin-supplier-add-btn').addEventListener('click', () => {
+  S.editingSupplierId = null;
+  el('admin-supplier-form-title').textContent = 'Nový dodávateľ';
+  ['asf-name','asf-ico','asf-address','asf-zip','asf-city','asf-dic','asf-contact','asf-phone','asf-email'].forEach(id=>el(id).value='');
+  el('asf-is-active').checked = true;
+  el('admin-supplier-error').textContent = '';
+  el('admin-supplier-form-wrap').classList.remove('hidden');
+  el('admin-supplier-form-wrap').scrollIntoView({behavior:'smooth'});
+});
+
+window.__openEditSupplier = function(id) {
+  const s = (S.allSuppliers||[]).find(x=>x.id===id);
+  if (!s) return;
+  S.editingSupplierId = id;
+  el('admin-supplier-form-title').textContent = 'Editácia: ' + s.name;
+  el('asf-name').value = s.name||'';
+  el('asf-ico').value = s.ico||'';
+  el('asf-address').value = s.address||'';
+  el('asf-zip').value = s.zip||'';
+  el('asf-city').value = s.city||'';
+  el('asf-dic').value = s.dic||'';
+  el('asf-contact').value = s.contact_person||'';
+  el('asf-phone').value = s.phone||'';
+  el('asf-email').value = s.email||'';
+  el('asf-is-active').checked = !!s.is_active;
+  el('admin-supplier-error').textContent = '';
+  el('admin-supplier-form-wrap').classList.remove('hidden');
+  el('admin-supplier-form-wrap').scrollIntoView({behavior:'smooth'});
+};
+
+el('asf-cancel-btn').addEventListener('click', () => {
+  el('admin-supplier-form-wrap').classList.add('hidden');
+  S.editingSupplierId = null;
+});
+
+el('asf-save-btn').addEventListener('click', async () => {
+  el('admin-supplier-error').textContent = '';
+  const name = el('asf-name').value.trim();
+  const ico = el('asf-ico').value.trim();
+  const address = el('asf-address').value.trim();
+  const city = el('asf-city').value.trim();
+
+  if (!name || !ico || !address || !city) {
+    el('admin-supplier-error').textContent = 'Vyplňte aspoň Názov, IČO, Adresu a Mesto.';
+    return;
+  }
+  if (!/^\d{6,12}$/.test(ico)) {
+    el('admin-supplier-error').textContent = 'IČO musí obsahovať 6–12 číslic.';
+    return;
+  }
+
+  const data = {
+    name, ico, address, city,
+    zip: el('asf-zip').value.trim() || null,
+    dic: el('asf-dic').value.trim() || null,
+    contact_person: el('asf-contact').value.trim() || null,
+    phone: el('asf-phone').value.trim() || null,
+    email: el('asf-email').value.trim() || null,
+    is_active: el('asf-is-active').checked,
+  };
+
+  el('asf-save-btn').disabled = true;
+  let error;
+  if (S.editingSupplierId) {
+    ({error} = await supabaseClient.from('suppliers').update(data).eq('id', S.editingSupplierId));
+  } else {
+    data.created_by = S.profile.id;
+    ({error} = await supabaseClient.from('suppliers').insert(data));
+  }
+  el('asf-save-btn').disabled = false;
+
+  if (error) {
+    el('admin-supplier-error').textContent = error.message.includes('suppliers_ico_unique_idx')
+      ? 'Dodávateľ s týmto IČO už existuje.'
+      : 'Chyba: ' + error.message;
+    return;
+  }
+
+  el('admin-supplier-form-wrap').classList.add('hidden');
+  S.editingSupplierId = null;
+  await renderSuppliersAdmin(el('admin-supplier-search').value);
+  // Obnov hlavný zoznam dodávateľov pre formulár objednávky
+  const {data: refreshed} = await supabaseClient.from('suppliers').select('*').eq('is_active', true).order('name');
+  S.suppliers = refreshed || [];
+  buildDatalists();
+  alert('Dodávateľ bol uložený.');
+});
 
 checkSession();
 </script>
