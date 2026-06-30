@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>SUPTel - Objednávkový systém</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css"/>
-<script src="exceljs.bare.min.js"></script>
+<!-- ExcelJS sa načítava až na požiadanie (lazy load) - viď loadExcelJS() v skripte nižšie -->
+<!-- pôvodne: <script src="exceljs.bare.min.js"></script> -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root{
@@ -774,9 +775,16 @@ async function renderDashboard() {
   const myId = S.profile.id;
   const myLevel = S.profile.approval_level || 0;
 
-  // Potrebujeme aktuálne dáta - znovu načítaj orders (mohli sa zmeniť)
-  const {data: freshOrders} = await supabaseClient.from('orders').select('*').order('sequence_number',{ascending:false});
-  S.orders = freshOrders || [];
+  // Šetrenie dátového prenosu: celý zoznam objednávok znovu sťahujeme
+  // len ak ubehlo aspoň 20 sekúnd od posledného načítania (alebo ešte
+  // vôbec nebol načítaný). Pri rýchlom prepínaní medzi obrazovkami sa
+  // tak nestiahne tá istá tabuľka opakovane zbytočne.
+  const now = Date.now();
+  if (!S._ordersLoadedAt || now - S._ordersLoadedAt > 20000) {
+    const {data: freshOrders} = await supabaseClient.from('orders').select('*').order('sequence_number',{ascending:false});
+    S.orders = freshOrders || [];
+    S._ordersLoadedAt = now;
+  }
 
   // Moje schválenia (na zistenie, ktoré objednávky som JA postúpil ďalej)
   const {data: myApprovals} = await supabaseClient.from('approvals')
@@ -1481,7 +1489,26 @@ el('result-new-btn').addEventListener('click',()=>{
 });
 
 // ── EXCEL EXPORT ─────────────────────────────────────────────────────────
+// ── LAZY LOAD ExcelJS ────────────────────────────────────────────────────
+// ExcelJS (~850 KB) sa sťahuje až keď ho používateľ skutočne potrebuje
+// (klikne na "Excel"), nie pri každom otvorení appky - šetrí dátový
+// prenos (egress) pre používateľov, ktorí Excel vôbec nestiahnu.
+let _exceljsLoadPromise = null;
+function loadExcelJS() {
+  if (window.ExcelJS) return Promise.resolve();
+  if (_exceljsLoadPromise) return _exceljsLoadPromise;
+  _exceljsLoadPromise = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'exceljs.bare.min.js';
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error('Nepodarilo sa načítať ExcelJS knižnicu.'));
+    document.head.appendChild(s);
+  });
+  return _exceljsLoadPromise;
+}
+
 async function buildXlsx(order, items) {
+  await loadExcelJS();
   const comp=S.companies.find(c=>c.code===order.company_code)||{};
   const sup=order.supplier_snapshot||{};
   const tpl=S.templates.find(t=>t.code===order.template_code)||{};
