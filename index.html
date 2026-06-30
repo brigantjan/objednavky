@@ -1604,7 +1604,7 @@ async function printOrder(order, items) {
     for (const h of hist) {
       const approver = S.profiles.find(p=>p.id===h.approver_id);
       const sig = (sigs||[]).find(s=>s.profile_id===h.approver_id);
-      const sigImg = sig ? `<img src="data:image/png;base64,${sig.signature_b64}" style="max-height:40px;max-width:140px;display:block;margin-bottom:2px;"/>` : '';
+      const sigImg = sig ? `<img src="data:image/png;base64,${sig.signature_b64}" style="max-height:70px;max-width:245px;display:block;margin-bottom:2px;"/>` : '';
       const block = `${sigImg}<p style="font-size:10px;margin-top:2px;">${esc(approver?.full_name||'')}<br/>${fmtD(h.approved_at?.slice(0,10))}</p>`;
       if (h.level===1) sigL1Html = block;
       if (h.level===2) sigL2Html = block;
@@ -1615,7 +1615,7 @@ async function printOrder(order, items) {
     const {data:stamp} = await supabaseClient.from('company_stamps')
       .select('*').eq('company_code', order.company_code).maybeSingle();
     if (stamp) {
-      stampHtml = `<img src="data:image/png;base64,${stamp.stamp_b64}" style="max-height:70px;max-width:120px;position:absolute;right:10px;bottom:6px;opacity:0.92;"/>`;
+      stampHtml = `<img src="data:image/png;base64,${stamp.stamp_b64}" style="max-height:122px;max-width:210px;position:absolute;right:10px;bottom:6px;opacity:0.92;"/>`;
     }
   }
 
@@ -1668,7 +1668,7 @@ body{font-family:Calibri,Arial,sans-serif;font-size:11px;padding:12mm 15mm;displ
 .info-box{border:1px solid #000;padding:6px;font-size:10px;line-height:1.7;}
 .sep{border-top:2px solid #000;margin:8px 0 4px;}
 .appr{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:4px;}
-.appr-box{border:1px solid #000;min-height:75px;padding:5px;font-size:10px;position:relative;}
+.appr-box{border:1px solid #000;min-height:130px;padding:5px;font-size:10px;position:relative;overflow:visible;}
 .appr-box h4{font-weight:bold;margin-bottom:3px;}
 .notes-box{border:1px solid #000;min-height:30px;padding:5px;margin-top:5px;font-size:10px;}
 @media print{@page{size:A4;margin:10mm 15mm;} body{padding:0;min-height:277mm;}}
