@@ -469,6 +469,18 @@ td.total-cell{text-align:right;font-weight:600;white-space:nowrap;}
                 <label><input type="radio" name="payment" value="sekom"/> Šekom</label>
               </div>
             </div>
+            <div>
+              <label>Mena *</label>
+              <select id="order-currency">
+                <option value="EUR">EUR</option>
+                <option value="CZK">CZK</option>
+                <option value="__new__">+ Pridať inú menu…</option>
+              </select>
+            </div>
+            <div>
+              <label>Splatnosť faktúry (dní od dodania)</label>
+              <input type="number" id="invoice-due-days" min="0" step="1"/>
+            </div>
             <div><label>Doprava</label><input id="doprava"/></div>
             <div><label>Správa</label><input id="sprava"/></div>
             <div class="full"><label>Poznámky / pripomienky</label><textarea id="note" rows="2"></textarea></div>
@@ -996,24 +1008,22 @@ async function openOrder(order) {
     ['Dátum vystavenia', fmtD(order.order_date)],
     ['Dátum dodania', fmtD(order.delivery_date)||'—'],
     ['Platba', PM[order.payment_method]||order.payment_method],
-    ['Celkom', order.total_amount ? fmt(order.total_amount) : '—'],
+    ['Mena', order.currency||'EUR'],
+    ['Celkom', order.total_amount ? fmt(order.total_amount)+' '+(order.currency||'EUR') : '—'],
+    ['Splatnosť faktúry', (order.invoice_due_days ?? comp.invoice_due_days ?? 45)+' dní od dodania'],
     ...(order.doprava ? [['Doprava',order.doprava]] : []),
     ...(order.sprava ? [['Správa',order.sprava]] : []),
   ].forEach(([l,v]) => {
     grid.innerHTML += `<div class="lbl">${esc(l)}</div><div class="val">${esc(v)}</div>`;
   });
 
+  // Položky sú vždy v plnom formáte; riadky bez počtu/ceny (čisto textové) majú tieto stĺpce prázdne.
   const it = el('view-items');
-  if (tpl.show_quantity_columns) {
-    it.innerHTML = `<thead><tr><th>Počet</th><th>Jedn.</th><th>Popis</th><th>Cena/jedn.</th><th>CELKOM</th></tr></thead><tbody>`
-      + S.viewItems.map(i=>`<tr><td>${i.quantity??''}</td><td>${esc(i.unit||'')}</td><td>${esc(i.description)}</td>
-        <td class="total-cell">${i.unit_price!=null?fmt(i.unit_price):''}</td>
-        <td class="total-cell">${i.line_total!=null?fmt(i.line_total):''}</td></tr>`).join('')
-      + `<tr class="items-total-row"><td colspan="4">CELKOM</td><td class="total-cell">${fmt(order.total_amount)}</td></tr></tbody>`;
-  } else {
-    it.innerHTML = `<thead><tr><th>Popis</th></tr></thead><tbody>`
-      + S.viewItems.map(i=>`<tr><td>${esc(i.description)}</td></tr>`).join('') + '</tbody>';
-  }
+  it.innerHTML = `<thead><tr><th>Počet</th><th>Jedn.</th><th>Popis</th><th>Cena/jedn.</th><th>CELKOM</th></tr></thead><tbody>`
+    + S.viewItems.map(i=>`<tr><td>${i.quantity??''}</td><td>${esc(i.unit||'')}</td><td>${esc(i.description)}</td>
+      <td class="total-cell">${i.unit_price!=null?fmt(i.unit_price):''}</td>
+      <td class="total-cell">${i.line_total!=null?fmt(i.line_total):''}</td></tr>`).join('')
+    + `<tr class="items-total-row"><td colspan="4">CELKOM</td><td class="total-cell">${fmt(order.total_amount)} ${order.currency||'EUR'}</td></tr></tbody>`;
   S.lastOrder = order; S.lastItems = S.viewItems;
   renderStatusBadge(order.status||'vystavena');
   await loadApprovalPanel(order);
@@ -1157,6 +1167,8 @@ function cloneOrder(order, items) {
   el('doprava').value = order.doprava||'';
   el('sprava').value = order.sprava||'';
   el('note').value = order.note||'';
+  el('order-currency').value = order.currency||'EUR';
+  el('invoice-due-days').value = order.invoice_due_days ?? comp?.invoice_due_days ?? 45;
   const pm = document.querySelector(`input[name="payment"][value="${order.payment_method}"]`);
   if (pm) pm.checked = true;
   if (tpl?.billing_note) el('billing-note-wrap').classList.remove('hidden');
@@ -1242,37 +1254,31 @@ function buildForm(tpl) {
   el('order-date').value=today();
   syncDeliveryDateMin();
   el('delivery-date').value='';
+  el('order-currency').value='EUR';
+  el('invoice-due-days').value=S.selCompany?.invoice_due_days||45;
   buildItemsHead(tpl);
   el('items-body').innerHTML='';
   addItemRow();
 }
 
+// Tabuľka položiek je teraz vždy v plnom formáte (Počet/Jedn./Popis/Cena/CELKOM).
+// Vystavovateľ si sám zvolí per riadok, či ide o čisto textovú položku (nechá
+// Počet aj Cenu prázdne) alebo o počítanú položku (vyplní Počet a Cenu).
 function buildItemsHead(tpl) {
   const h=el('items-head');
-  if (tpl.show_quantity_columns) {
-    h.innerHTML='<th style="width:80px">Počet</th><th style="width:70px">Jedn.</th><th>Popis</th><th style="width:110px">Cena/jedn.</th><th style="width:100px">CELKOM</th><th style="width:28px"></th>';
-    el('items-total-row').classList.remove('hidden');
-  } else {
-    h.innerHTML='<th>Popis</th><th style="width:28px"></th>';
-    el('items-total-row').classList.add('hidden');
-  }
+  h.innerHTML='<th style="width:70px">Počet</th><th style="width:60px">Jedn.</th><th>Popis</th><th style="width:110px">Cena/jedn.</th><th style="width:100px">CELKOM</th><th style="width:28px"></th>';
+  el('items-total-row').classList.remove('hidden');
 }
 
 function addItemRow(pf) {
-  const tpl=S.selTemplate;
   const tr=document.createElement('tr');
-  if (tpl?.show_quantity_columns) {
-    tr.innerHTML=`<td><input type="number" step="0.001" min="0" class="iq" value="${pf?.quantity??''}"/></td>
-      <td><input list="units-dl" class="iu" value="${esc(pf?.unit||'')}"/></td>
-      <td><input type="text" class="id" value="${esc(pf?.description||'')}"/></td>
-      <td><input type="number" step="0.0001" min="0" class="ip" value="${pf?.unit_price??''}"/></td>
-      <td class="total-cell">${pf?.line_total!=null?fmt(pf.line_total):'0,00 €'}</td>
-      <td><button type="button" class="danger">×</button></td>`;
-    tr.querySelectorAll('.iq,.ip').forEach(i=>i.addEventListener('input',()=>recalcRow(tr)));
-  } else {
-    tr.innerHTML=`<td><input type="text" class="id" value="${esc(pf?.description||'')}"/></td>
-      <td><button type="button" class="danger">×</button></td>`;
-  }
+  tr.innerHTML=`<td><input type="number" step="0.001" min="0" class="iq" value="${pf?.quantity??''}" placeholder="—"/></td>
+    <td><input list="units-dl" class="iu" value="${esc(pf?.unit||'')}" placeholder="—"/></td>
+    <td><input type="text" class="id" value="${esc(pf?.description||'')}"/></td>
+    <td><input type="number" step="0.0001" min="0" class="ip" value="${pf?.unit_price??''}" placeholder="—"/></td>
+    <td class="total-cell">${pf?.line_total!=null?fmt(pf.line_total):''}</td>
+    <td><button type="button" class="danger">×</button></td>`;
+  tr.querySelectorAll('.iq,.ip').forEach(i=>i.addEventListener('input',()=>recalcRow(tr)));
   if (!el('units-dl')) {
     const dl=document.createElement('datalist'); dl.id='units-dl';
     dl.innerHTML=UNITS.map(u=>`<option value="${u}"></option>`).join('');
@@ -1284,17 +1290,29 @@ function addItemRow(pf) {
 
 el('add-item-btn').addEventListener('click', ()=>addItemRow());
 
+// ── MENA (voľba + pridanie vlastnej) ───────────────────────────────────────
+el('order-currency').addEventListener('change', function(){
+  if (this.value !== '__new__') return;
+  const code = (prompt('Zadajte kód meny (napr. USD, GBP):')||'').trim().toUpperCase();
+  if (!code) { this.value='EUR'; return; }
+  if (![...this.options].some(o=>o.value===code)) {
+    const opt=document.createElement('option'); opt.value=code; opt.textContent=code;
+    this.insertBefore(opt, this.querySelector('option[value="__new__"]'));
+  }
+  this.value = code;
+});
+
 function recalcRow(tr) {
-  const q=parseFloat(tr.querySelector('.iq')?.value)||0;
-  const p=parseFloat(tr.querySelector('.ip')?.value)||0;
-  const tc=tr.querySelector('.total-cell'); if(tc) tc.textContent=fmt(q*p);
+  const qv=tr.querySelector('.iq')?.value, pv=tr.querySelector('.ip')?.value;
+  const tc=tr.querySelector('.total-cell');
+  if (tc) tc.textContent = (qv===''||pv==='') ? '' : fmt((parseFloat(qv)||0)*(parseFloat(pv)||0));
   recalcTotal();
 }
 function recalcTotal() {
-  if (!S.selTemplate?.show_quantity_columns) { el('items-total-val').textContent=fmt(0); return; }
   let t=0;
   document.querySelectorAll('#items-body tr').forEach(tr=>{
-    t+=(parseFloat(tr.querySelector('.iq')?.value)||0)*(parseFloat(tr.querySelector('.ip')?.value)||0);
+    const qv=tr.querySelector('.iq')?.value, pv=tr.querySelector('.ip')?.value;
+    if (qv!=='' && pv!=='') t+=(parseFloat(qv)||0)*(parseFloat(pv)||0);
   });
   el('items-total-val').textContent=fmt(t);
 }
@@ -1368,17 +1386,19 @@ el('order-form').addEventListener('submit', async e => {
   const items=[]; let hasDesc=false;
   document.querySelectorAll('#items-body tr').forEach(tr=>{
     const desc=tr.querySelector('.id')?.value.trim(); if(!desc) return; hasDesc=true;
-    const it={description:desc,quantity:null,unit_price:null,unit:null};
-    if(tpl.show_quantity_columns){
-      const q=tr.querySelector('.iq')?.value, p=tr.querySelector('.ip')?.value;
-      it.quantity=q===''?null:parseFloat(q);
-      it.unit_price=p===''?null:parseFloat(p);
-      it.unit=tr.querySelector('.iu')?.value.trim()||null;
-    }
-    items.push(it);
+    const q=tr.querySelector('.iq')?.value, p=tr.querySelector('.ip')?.value;
+    items.push({
+      description:desc,
+      quantity:q===''?null:parseFloat(q),
+      unit_price:p===''?null:parseFloat(p),
+      unit:tr.querySelector('.iu')?.value.trim()||null
+    });
   });
   if(!hasDesc){setErr('err-items','Pridajte aspoň jednu položku.');ok=false;}
   else setErr('err-items','');
+
+  const orderCurrency = el('order-currency').value || 'EUR';
+  const orderInvoiceDueDays = el('invoice-due-days').value===''?null:parseInt(el('invoice-due-days').value,10);
 
   const ddVal=el('delivery-date').value;
   if(ddVal&&ddVal<orderDate){setErr('err-delivery-date','Dátum dodania nesmie byť pred dátumom vystavenia.');ok=false;}
@@ -1415,6 +1435,10 @@ el('order-form').addEventListener('submit', async e => {
         p_order_date:     orderDate
       });
       if(ue){ el('form-error').textContent='Chyba: '+ue.message; el('form-error').classList.remove('hidden'); el('submit-btn').disabled=false; return; }
+      // Mena a splatnosť faktúry nie sú (zatiaľ) súčasťou update_order RPC funkcie,
+      // dopĺňajú sa samostatným update-om priamo na tabuľke orders.
+      await supabaseClient.from('orders').update({currency:orderCurrency, invoice_due_days:orderInvoiceDueDays}).eq('id', updOrder.id);
+      updOrder.currency = orderCurrency; updOrder.invoice_due_days = orderInvoiceDueDays;
       // Refresh items
       const {data:oItems}=await supabaseClient.from('order_items').select('*').eq('order_id',updOrder.id).order('position');
       updOrder.order_date=orderDate;
@@ -1469,6 +1493,10 @@ el('order-form').addEventListener('submit', async e => {
       el('form-error').textContent='Chyba: '+oe.message;
       el('form-error').classList.remove('hidden'); el('submit-btn').disabled=false; return;
     }
+    // Mena a splatnosť faktúry nie sú (zatiaľ) súčasťou create_order RPC funkcie,
+    // dopĺňajú sa samostatným update-om priamo na tabuľke orders.
+    await supabaseClient.from('orders').update({currency:orderCurrency, invoice_due_days:orderInvoiceDueDays}).eq('id', order.id);
+    order.currency = orderCurrency; order.invoice_due_days = orderInvoiceDueDays;
     const {data:oItems}=await supabaseClient.from('order_items').select('*').eq('order_id',order.id).order('position');
     order.order_date=orderDate;
     S.lastOrder=order; S.lastItems=oItems||[];
@@ -1800,13 +1828,19 @@ async function exportExcel(order, items) {
 async function printOrder(order, items) {
   const comp=S.companies.find(c=>c.code===order.company_code)||{};
   const sup=order.supplier_snapshot||{};
-  const tpl=S.templates.find(t=>t.code===order.template_code)||{};
+  const currency=order.currency||'EUR';
+  const dueDays=order.invoice_due_days ?? comp.invoice_due_days ?? 45;
+  const zakazka=S.zakazky?.find(z=>z.cislo===order.zakazka_cislo);
+
+  // Bankový účet podľa meny objednávky (CZK účet je voliteľný, ak chýba, padne späť na EUR účet)
+  const bankAccount = currency==='CZK' ? (comp.bank_account_czk||comp.bank_account||'') : (comp.bank_account||'');
+  const bankName     = currency==='CZK' ? (comp.bank_name_czk||comp.bank_name||'')     : (comp.bank_name||'');
 
   // Načítaj schválenia a podpisy (ak existujú)
   const {data:hist} = await supabaseClient.from('approvals')
     .select('*').eq('order_id',order.id).eq('action','schvalene').order('level');
-  let sigL1Html = '<p style="color:#999;font-size:10px;">nepodpísané</p>';
-  let sigL2Html = '<p style="color:#999;font-size:10px;">nepodpísané</p>';
+  let sigL1Html = '<p style="color:#999;font-size:9.5px;">nepodpísané</p>';
+  let sigL2Html = '<p style="color:#999;font-size:9.5px;">nepodpísané</p>';
   let stampHtml = '';
   if (hist && hist.length>0) {
     if (!S.profiles) {
@@ -1818,7 +1852,7 @@ async function printOrder(order, items) {
       const approver = S.profiles.find(p=>p.id===h.approver_id);
       const sig = (sigs||[]).find(s=>s.profile_id===h.approver_id);
       const sigImg = sig ? `<img src="data:image/png;base64,${sig.signature_b64}" style="max-height:91px;max-width:318px;display:block;margin-bottom:2px;filter:grayscale(1) brightness(0.4) sepia(1) hue-rotate(190deg) saturate(6);"/>` : '';
-      const block = `${sigImg}<p style="font-size:10px;margin-top:2px;">${esc(approver?.full_name||'')}<br/>${fmtDateTime(h.approved_at)}</p>`;
+      const block = `${sigImg}<p style="font-size:9.5px;margin-top:2px;">${esc(approver?.full_name||'')}<br/>${fmtDateTime(h.approved_at)}</p>`;
       if (h.level===1) sigL1Html = block;
       if (h.level===2) sigL2Html = block;
     }
@@ -1828,123 +1862,235 @@ async function printOrder(order, items) {
     const {data:stamp} = await supabaseClient.from('company_stamps')
       .select('*').eq('company_code', order.company_code).maybeSingle();
     if (stamp) {
-      stampHtml = `<img src="data:image/png;base64,${stamp.stamp_b64}" style="max-height:122px;max-width:210px;position:absolute;right:10px;bottom:6px;opacity:0.95;filter:contrast(1.6) brightness(0.75) saturate(1.2);mix-blend-mode:multiply;"/>`;
+      stampHtml = `<img src="data:image/png;base64,${stamp.stamp_b64}" style="max-height:122px;max-width:210px;position:absolute;right:6px;bottom:0;opacity:0.95;filter:contrast(1.6) brightness(0.75) saturate(1.2);mix-blend-mode:multiply;"/>`;
     }
   }
 
-  let iHtml='';
-  if(tpl.show_quantity_columns){
-    iHtml=`<table class="pi"><thead><tr>
-      <th style="width:60px">Počet</th><th style="width:50px">Jedn.</th>
-      <th>Popis</th><th style="width:110px;text-align:right">Cena za jedn.</th>
-      <th style="width:90px;text-align:right">CELKOM</th></tr></thead><tbody>`
-      +items.map(it=>`<tr>
-        <td style="text-align:right">${it.quantity??''}</td>
-        <td style="text-align:center">${esc(it.unit||'')}</td>
-        <td>${esc(it.description)}</td>
-        <td style="text-align:right">${it.unit_price!=null?fmt(it.unit_price):''}</td>
-        <td style="text-align:right;font-weight:600">${it.line_total!=null?fmt(it.line_total):''}</td></tr>`).join('')
-      +`<tr style="background:#d9d9d9;font-weight:bold">
-        <td colspan="4" style="text-align:right">CELKOM</td>
-        <td style="text-align:right">${fmt(order.total_amount)}</td></tr></tbody></table>`;
-  } else {
-    iHtml=`<table class="pi"><thead><tr><th>Popis</th></tr></thead><tbody>`
-      +items.map(it=>`<tr><td>${esc(it.description)}</td></tr>`).join('')+'</tbody></table>';
-  }
+  // Položky: text-only riadok (bez počtu/ceny) sa zobrazí ako celoriadkový text,
+  // riadok s vyplneným počtom aj cenou sa zobrazí ako klasický itemizovaný riadok.
+  const itemsHtml = items.map(it=>{
+    const isText = it.quantity==null && it.unit_price==null;
+    if (isText) {
+      return `<div class="item-row text-row">${esc(it.description).replace(/\n/g,'<br/>')}</div>`;
+    }
+    return `<div class="cols item-row itemized">
+      <div class="num">${it.quantity??''}</div>
+      <div class="unit">${esc(it.unit||'')}</div>
+      <div>${esc(it.description)}</div>
+      <div class="price">${it.unit_price!=null?fmt(it.unit_price):''}</div>
+      <div class="total">${it.line_total!=null?fmt(it.line_total):''}</div>
+    </div>`;
+  }).join('');
 
-  const introText=esc(order.intro_text||'').replace(/\n/g,'<br/>');
+  const zakazkaHtml = zakazka
+    ? `<b>${esc(zakazka.nazov||'')}</b> (č.z. ${esc(order.zakazka_cislo)})`
+    : `Zákazka č.: ${esc(order.zakazka_cislo)}`;
+  const introText = order.intro_text ? `<b>Objednávame si u Vás:</b> ${esc(order.intro_text).replace(/\n/g,'<br/>')}` : '';
+
   const html=`<!DOCTYPE html><html lang="sk"><head><meta charset="UTF-8"/>
 <title>Objednávka ${esc(order.order_number)}</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 html,body{height:100%;}
-body{font-family:Calibri,Arial,sans-serif;font-size:11px;padding:12mm 15mm;display:flex;flex-direction:column;min-height:297mm;}
-.top-content{flex:0 0 auto;}
-.spacer{flex:1 1 auto;min-height:10mm;}
-.bottom-content{flex:0 0 auto;}
-.hdr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;}
-.co{font-size:10px;line-height:1.5;}
-.on{font-size:11px;font-weight:bold;text-align:right;}
-.title{font-size:22px;font-weight:bold;font-style:italic;text-align:center;margin:6px 0 8px;}
-.parties{display:grid;grid-template-columns:1fr 1fr;border:1px solid #000;margin:4px 0 6px;}
-.party{padding:5px 7px;}
-.party h4{font-size:10px;font-weight:bold;background:#d9d9d9;padding:2px 5px;margin:-5px -7px 5px;}
-.party p{font-size:10px;line-height:1.55;}
-.zakazka{font-size:11px;font-weight:bold;margin:4px 0 6px;}
-.intro{font-size:11px;font-weight:bold;margin:3px 0 5px;}
-.pi{width:100%;border-collapse:collapse;margin:4px 0 6px;}
-.pi th,.pi td{border:1px solid #000;padding:3px 5px;font-size:10px;}
-.pi th{background:#d9d9d9;font-weight:bold;}
-.note-text{font-size:10px;margin:3px 0;}
-.bottom{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px;}
-.pay-box{font-size:10px;line-height:1.7;}
-.info-box{border:1px solid #000;padding:6px;font-size:10px;line-height:1.7;}
-.sep{border-top:2px solid #000;margin:8px 0 4px;}
-.appr{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:4px;}
-.appr-box{border:1px solid #000;min-height:155px;padding:5px;font-size:10px;position:relative;overflow:visible;}
-.appr-box h4{font-weight:bold;margin-bottom:3px;}
-.notes-box{border:1px solid #000;min-height:30px;padding:5px;margin-top:5px;font-size:10px;}
+body{font-family:Calibri,Arial,sans-serif;font-size:11px;padding:12mm 15mm;display:flex;flex-direction:column;min-height:297mm;color:#000;}
+
+.hdr{display:flex;justify-content:space-between;align-items:flex-start;}
+.hdr-left{display:flex;gap:12px;align-items:flex-start;}
+.hdr-left img{height:46px;margin-top:4px;}
+.co-name{font-size:21px;display:inline-block;border-bottom:1.5px solid #000;padding-bottom:2px;margin-bottom:3px;width:fit-content;}
+.co-addr{font-size:10px;line-height:1.55;}
+.on{font-size:11px;font-weight:bold;text-align:right;white-space:nowrap;margin-top:4px;}
+
+.dbl-line{border-top:2.5px solid #000;border-bottom:1px solid #000;height:5px;margin:6px 0 4px;}
+.title-row{display:flex;align-items:center;justify-content:center;gap:14px;margin:2px 0 10px;}
+.title-row .ln{flex:0 0 60px;height:0;border-top:2px solid #000;}
+.title-row .tt{font-size:24px;font-weight:bold;font-style:italic;letter-spacing:1px;}
+
+.box{border:1px solid #000;border-radius:9px;position:relative;padding:12px 10px 7px;}
+.box-label{position:absolute;top:-9px;left:12px;background:#fff;padding:0 6px;font-weight:bold;font-size:10.5px;}
+
+.parties{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:14px 0 10px;}
+.field-row{display:flex;font-size:10px;margin-bottom:3.5px;align-items:baseline;}
+.field-label{width:58px;flex-shrink:0;}
+.field-value{flex:1;border-bottom:1px solid #000;padding-bottom:1px;min-height:12px;}
+.field-row.psc .field-value.zip{flex:0 0 70px;margin-right:10px;}
+.field-row.psc .field-value.city{flex:1;}
+
+.zakazka-line{font-size:11px;margin:0 0 8px;}
+
+.items-wrap{flex:1;display:flex;flex-direction:column;margin-bottom:6px;}
+.items-frame{border:1px solid #000;flex:1;display:flex;flex-direction:column;}
+.cols{display:grid;grid-template-columns:52px 42px 1fr 92px 92px;}
+.items-head{background:#e2e2e2;font-weight:bold;font-size:9.5px;border-bottom:1px solid #000;}
+.items-head>div{padding:4px 5px;border-right:1px solid #000;}
+.items-head>div:last-child{border-right:none;text-align:right;}
+.items-head>div:nth-child(4){text-align:right;}
+
+.item-row{border-bottom:1px solid #000;font-size:10px;}
+.item-row.itemized>div{padding:4px 5px;border-right:1px solid #000;}
+.item-row.itemized>div:last-child{border-right:none;}
+.item-row.itemized .num{text-align:right;}
+.item-row.itemized .unit{text-align:center;}
+.item-row.itemized .price{text-align:right;}
+.item-row.itemized .total{text-align:right;font-weight:600;}
+.item-row.text-row{padding:6px 6px;line-height:1.5;}
+
+.items-filler{flex:1;}
+.items-footnote{font-size:9.5px;padding:6px;border-top:1px solid #ccc;line-height:1.55;}
+
+.total-row{display:flex;justify-content:flex-end;align-items:center;gap:6px;margin:5px 0 10px;font-size:11px;font-weight:bold;}
+.total-row .lbl{border:1px solid #000;border-right:none;padding:4px 10px;background:#e2e2e2;}
+.total-row .val{border:1px solid #000;padding:4px 14px;min-width:90px;text-align:right;}
+.total-row .cur{font-size:9.5px;font-weight:normal;}
+
+.pay-date-row{display:grid;grid-template-columns:1.5fr 0.8fr;gap:14px;margin-bottom:10px;}
+.pay-opts{margin:2px 0 4px;}
+.pay-opts .opt{display:block;font-size:10px;}
+.pay-line{display:flex;font-size:10px;margin-top:3px;}
+.pay-line .l{width:118px;flex-shrink:0;}
+.pay-line .v{flex:1;border-bottom:1px solid #000;}
+.pay-cur-tag{font-size:9px;background:#eee;border-radius:3px;padding:0 4px;margin-left:6px;}
+.date-box{min-height:34px;}
+
+.appr-row{display:grid;grid-template-columns:1.5fr 0.8fr;gap:14px;margin-top:2px;}
+.appr-box{min-height:170px;font-size:9.5px;}
+.appr-lvl{margin-bottom:8px;position:relative;}
+.appr-lvl .lvl{font-weight:bold;margin-bottom:2px;}
+
+.right-col{display:flex;flex-direction:column;gap:8px;}
+.meta-box{border:1px solid #000;font-size:10px;}
+.meta-box .r{display:flex;border-bottom:1px solid #000;}
+.meta-box .r:last-child{border-bottom:none;}
+.meta-box .r .l{width:78px;flex-shrink:0;padding:4px 6px;border-right:1px solid #000;background:#f2f2f2;}
+.meta-box .r .v{flex:1;padding:4px 6px;}
+
+.pickup-box{font-size:9.5px;padding:8px 10px 6px;}
+.pickup-box .pl{display:flex;margin-top:14px;}
+.pickup-box .pl .u{flex:1;border-bottom:1px solid #000;padding-bottom:1px;}
+.pickup-box .cap{font-size:8.5px;color:#555;margin-top:2px;}
+
+.notes-box{margin-top:10px;min-height:28px;}
+
 @media print{@page{size:A4;margin:10mm 15mm;} body{padding:0;min-height:277mm;}}
 </style></head><body>
-<div class="top-content">
+
 <div class="hdr">
-  <div style="display:flex;gap:10px;align-items:flex-start">
-    <img src="data:image/png;base64,${LOGO_B64}" style="height:52px;"/>
-    <div class="co">
-      <strong style="font-size:14px">${esc(comp.name)}</strong><br/>
-      ${esc(comp.address)}, ${esc(comp.zip)} ${esc(comp.city)}<br/>
-      tel. +421 244 451 339 &nbsp; mail: ${esc(comp.email)}<br/>
-      IČO: ${esc(comp.ico)} &nbsp; DIČ: ${esc(comp.dic)}
+  <div class="hdr-left">
+    <img src="data:image/png;base64,${LOGO_B64}"/>
+    <div>
+      <div class="co-name">${esc(comp.name)}</div>
+      <div class="co-addr">
+        ${esc(comp.address)}, ${esc(comp.zip)} ${esc(comp.city)}<br/>
+        tel. +421 244 451 339 &nbsp; mail: ${esc(comp.email)}<br/>
+        IČO: ${esc(comp.ico)}
+      </div>
     </div>
   </div>
   <div class="on">Objednávka č. ${esc(order.order_number)}</div>
 </div>
-<div class="title">OBJEDNÁVKA</div>
+
+<div class="dbl-line"></div>
+<div class="title-row"><div class="ln"></div><div class="tt">OBJEDNÁVKA</div><div class="ln"></div></div>
+
 <div class="parties">
-  <div class="party"><h4>Dodávateľ</h4><p>
-    ${esc(sup.name)}<br/>${esc(sup.address)}<br/>${esc(sup.zip||'')} ${esc(sup.city||'')}<br/>
-    Vybavuje: ${esc(sup.contact_person||'—')}<br/>Telefón: ${esc(sup.phone||'—')}<br/>
-    IČO: ${esc(sup.ico||'')} &nbsp; DIČ: ${esc(sup.dic||'')}
-  </p></div>
-  <div class="party"><h4>Odberateľ</h4><p>
-    ${esc(comp.name)}<br/>${esc(comp.address)}<br/>${esc(comp.zip)} ${esc(comp.city)}<br/>
-    Vybavuje: ${esc(S.profile.full_name)}<br/>Telefón: ${esc(S.profile.phone||'—')}<br/>
-    IČO: ${esc(comp.ico)} &nbsp; DIČ: ${esc(comp.dic)}
-  </p></div>
-</div>
-<div class="zakazka">Zákazka č.: ${esc(order.zakazka_cislo)}</div>
-<div class="intro">${introText}</div>
-${iHtml}
-${order.billing_note?`<p class="note-text">${esc(order.billing_note).replace(/\n/g,'<br/>')}</p>`:''}
-<p class="note-text"><strong>Faktúru pošlite na adresu:</strong><br/>
-${esc(comp.name)}, ${esc(comp.address)}, ${esc(comp.zip)} ${esc(comp.city)}<br/>
-${esc(comp.email)}<br/>Splatnosť faktúry: ${comp.invoice_due_days||45} dní od dodania</p>
-${order.attachment_note?`<p class="note-text"><strong>Prílohy:</strong> ${esc(order.attachment_note)}</p>`:''}
-</div>
-<div class="spacer"></div>
-<div class="bottom-content">
-<div class="bottom">
-  <div class="pay-box">
-    <strong>Podrobnosti platby</strong><br/>
-    ${['sekom','hotovost','kreditka','ucet'].map(c=>(c===order.payment_method?'● ':'○ ')+(PM[c]||c)).join('<br/>')}<br/>
-    Číslo účtu: ${esc(comp.bank_account||'')}<br/>
-    Kód banky / Platí do: ${esc(comp.bank_name||'')}
+  <div class="box">
+    <div class="box-label">Dodávateľ</div>
+    <div class="field-row"><div class="field-label">Meno</div><div class="field-value">${esc(sup.name)}</div></div>
+    <div class="field-row"><div class="field-label">Adresa</div><div class="field-value">${esc(sup.address||'')}</div></div>
+    <div class="field-row psc"><div class="field-label">PSČ</div><div class="field-value zip">${esc(sup.zip||'')}</div><div class="field-value city">${esc(sup.city||'')}</div></div>
+    <div class="field-row"><div class="field-label">Vybavuje</div><div class="field-value">${esc(sup.contact_person||'')}</div></div>
+    <div class="field-row"><div class="field-label">Telefon</div><div class="field-value">${esc(sup.phone||'')}</div></div>
+    <div class="field-row"><div class="field-label">Email</div><div class="field-value">${esc(sup.email||'')}</div></div>
+    <div class="field-row"><div class="field-label">IČO</div><div class="field-value">${esc(sup.ico||'')}</div></div>
+    <div class="field-row"><div class="field-label">DIČ</div><div class="field-value">${esc(sup.dic||'')}</div></div>
   </div>
-  <div class="info-box">
-    <strong>Dátum dodania:</strong> ${esc(order.delivery_date||'—')}<br/>
-    <strong>Dátum vystavenia:</strong> ${esc(order.order_date||'')}<br/>
-    <strong>Objedn. č.:</strong> ${esc(order.order_number)}<br/>
-    <strong>Správa:</strong> ${esc(order.sprava||'')}<br/>
-    <strong>Doprava:</strong> ${esc(order.doprava||'')}
+  <div class="box">
+    <div class="box-label">Odberateľ</div>
+    <div class="field-row"><div class="field-label">Meno</div><div class="field-value">${esc(comp.name)}</div></div>
+    <div class="field-row"><div class="field-label">Adresa</div><div class="field-value">${esc(comp.address)}</div></div>
+    <div class="field-row psc"><div class="field-label">PSČ</div><div class="field-value zip">${esc(comp.zip)}</div><div class="field-value city">${esc(comp.city)}</div></div>
+    <div class="field-row"><div class="field-label">Vybavuje</div><div class="field-value">${esc(S.profile.full_name)}</div></div>
+    <div class="field-row"><div class="field-label">Telefon</div><div class="field-value">${esc(S.profile.phone||'')}</div></div>
+    <div class="field-row"><div class="field-label">Email</div><div class="field-value">${esc(S.profile.email||'')}</div></div>
+    <div class="field-row"><div class="field-label">IČO</div><div class="field-value">${esc(comp.ico)}</div></div>
+    <div class="field-row"><div class="field-label">DIČ</div><div class="field-value">${esc(comp.dic)}</div></div>
   </div>
 </div>
-<div class="sep"></div>
-<div class="appr" style="position:relative;">
-  <div class="appr-box" id="appr-box-l1"><h4>Schválil (1. úroveň – vedúci strediska)</h4>${sigL1Html}</div>
-  <div class="appr-box" id="appr-box-l2" style="position:relative;"><h4>Schválil (2. úroveň – riaditeľ)</h4>${sigL2Html}${stampHtml}</div>
+
+<div class="zakazka-line">${zakazkaHtml}</div>
+
+<div class="items-wrap">
+  <div class="items-frame">
+    <div class="cols items-head">
+      <div>Počet</div><div>Jedn.</div><div>Popis</div>
+      <div>Cena za jedn.</div><div>CELKOM</div>
+    </div>
+    ${introText?`<div class="item-row text-row">${introText}</div>`:''}
+    ${itemsHtml}
+    <div class="items-filler"></div>
+    <div class="items-footnote">
+      ${order.billing_note?`${esc(order.billing_note).replace(/\n/g,'<br/>')}<br/>`:''}
+      <b>Faktúru pošlite na adresu:</b> ${esc(comp.name)}, ${esc(comp.address)}, ${esc(comp.zip)} ${esc(comp.city)} &nbsp;|&nbsp; ${esc(comp.email)} &nbsp;|&nbsp; Splatnosť faktúry: ${dueDays} dní od dodania
+      ${order.attachment_note?`<br/><b>Prílohy:</b> ${esc(order.attachment_note)}`:''}
+    </div>
+  </div>
 </div>
-${order.note?`<div class="notes-box"><strong>Poznámky / pripomienky:</strong><br/>${esc(order.note)}</div>`:'<div class="notes-box"><strong>Poznámky / pripomienky</strong></div>'}
+
+<div class="total-row"><div class="lbl">CELKOM</div><div class="val">${fmt(order.total_amount)}</div><div class="cur">${esc(currency)}</div></div>
+
+<div class="pay-date-row">
+  <div class="box pay-box">
+    <div class="box-label">Podrobnosti platby</div>
+    <div class="pay-opts">
+      ${['sekom','hotovost','kreditka','ucet'].map(c=>`<span class="opt">${(c===order.payment_method?'● ':'○ ')+(PM[c]||c)}</span>`).join('')}
+    </div>
+    <div class="pay-line"><div class="l">Číslo účtu / kreditní karty</div><div class="v">${esc(bankAccount)} <span class="pay-cur-tag">${esc(currency)}</span></div></div>
+    <div class="pay-line"><div class="l">Kód banky / Platí do</div><div class="v">${esc(bankName)}</div></div>
+  </div>
+  <div class="box date-box">
+    <div class="box-label">Dátum dodania</div>
+    <div class="field-value" style="margin-top:2px;">${esc(order.delivery_date?fmtD(order.delivery_date):'')}</div>
+  </div>
 </div>
+
+<div class="dbl-line"></div>
+
+<div class="appr-row">
+  <div class="box appr-box" style="position:relative;">
+    <div class="box-label">Schválenie</div>
+    <div class="appr-lvl">
+      <div class="lvl">1. úroveň — vedúci strediska</div>
+      ${sigL1Html}
+    </div>
+    <div class="appr-lvl">
+      <div class="lvl">2. úroveň — riaditeľ</div>
+      ${sigL2Html}
+    </div>
+    ${stampHtml}
+  </div>
+  <div class="right-col">
+    <div class="meta-box">
+      <div class="r"><div class="l">Dátum</div><div class="v">${esc(order.order_date?fmtD(order.order_date):'')}</div></div>
+      <div class="r"><div class="l">Objedn. č.</div><div class="v">${esc(order.order_number)}</div></div>
+      <div class="r"><div class="l">Mena</div><div class="v">${esc(currency)}</div></div>
+      <div class="r"><div class="l">Správa</div><div class="v">${esc(order.sprava||'')}</div></div>
+      <div class="r"><div class="l">Doprava</div><div class="v">${esc(order.doprava||'')}</div></div>
+    </div>
+    <div class="box pickup-box">
+      <div class="box-label">Prevzatie objednávky (dodávateľ)</div>
+      <div class="pl"><div class="u">&nbsp;</div></div>
+      <div class="cap">Meno, priezvisko a podpis za dodávateľa</div>
+      <div class="pl" style="margin-top:10px;"><div class="u">&nbsp;</div></div>
+      <div class="cap">Dátum prevzatia</div>
+    </div>
+  </div>
+</div>
+
+<div class="box notes-box">
+  <div class="box-label">Poznámky / pripomienky</div>
+  ${order.note?esc(order.note).replace(/\n/g,'<br/>'):''}
+</div>
+
 <script>window.onload=function(){window.print();}<\/script>
 </body></html>`;
 
@@ -1995,6 +2141,8 @@ function startEdit(order, items) {
   el('doprava').value = order.doprava||'';
   el('sprava').value = order.sprava||'';
   el('note').value = order.note||'';
+  el('order-currency').value = order.currency||'EUR';
+  el('invoice-due-days').value = order.invoice_due_days ?? S.selCompany?.invoice_due_days ?? 45;
   const pm = document.querySelector(`input[name="payment"][value="${order.payment_method}"]`);
   if (pm) pm.checked = true;
 
