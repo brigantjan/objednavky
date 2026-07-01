@@ -373,16 +373,15 @@ td.total-cell{text-align:right;font-weight:600;white-space:nowrap;}
         <div class="tile-grid" id="company-tiles"></div>
       </section>
 
-      <!-- KROK 2 -->
+      <!-- (typ objednávky sa už nevyberá - appka používa jediný univerzálny formulár) -->
       <section class="card hidden" id="step-template">
-        <h2>2. Vyberte typ objednávky</h2>
         <div class="tile-grid" id="template-tiles"></div>
       </section>
 
-      <!-- KROK 3 -->
+      <!-- KROK 2 -->
       <section class="card hidden" id="step-form">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
-          <h2 id="form-title" style="margin:0;">3. Vyplňte objednávku</h2>
+          <h2 id="form-title" style="margin:0;">2. Vyplňte objednávku</h2>
           <span id="form-edit-badge" class="hidden" style="font-size:12px;background:#fff3cd;color:#856404;border:1px solid #ffc107;padding:3px 10px;border-radius:20px;font-weight:600;">Režim editácie</span>
         </div>
         <div id="form-error" class="banner error hidden"></div>
@@ -397,9 +396,10 @@ td.total-cell{text-align:right;font-weight:600;white-space:nowrap;}
 
             <div>
               <label>Interná zákazka *</label>
-              <input list="zakazky-list" id="zakazka-input" placeholder="Číslo alebo názov zákazky..." autocomplete="off"/>
+              <input list="zakazky-list" id="zakazka-input" placeholder="Napr. 500899 - Názov stavby, alebo len Balíčky..." autocomplete="off"/>
               <datalist id="zakazky-list"></datalist>
               <div class="field-error" id="err-zakazka"></div>
+              <small style="color:var(--muted);display:block;margin-top:3px;">Môžete vybrať existujúcu zákazku zo zoznamu, alebo zadať novú - buď v tvare "číslo - názov", alebo len ako text (napr. "Balíčky"). Nová zákazka sa automaticky založí.</small>
             </div>
 
             <div class="full">
@@ -496,7 +496,7 @@ td.total-cell{text-align:right;font-weight:600;white-space:nowrap;}
         </form>
       </section>
 
-      <!-- KROK 4 -->
+      <!-- KROK 3 -->
       <section class="card hidden" id="step-result">
         <div class="banner success" id="result-banner"></div>
         <div class="actions" style="justify-content:center;">
@@ -1175,7 +1175,7 @@ function cloneOrder(order, items) {
   if (order.attachment_note) el('attachment-note-wrap').classList.remove('hidden');
 
   const z = S.zakazky.find(z=>z.cislo===order.zakazka_cislo);
-  if (z) el('zakazka-input').value = z.cislo+' - '+z.nazov;
+  if (z) el('zakazka-input').value = zLabel(z);
 
   const sup = order.supplier_snapshot;
   if (sup) {
@@ -1194,6 +1194,10 @@ function showStep(id) {
   el(id).classList.remove('hidden');
 }
 
+function pickUniversalTemplate() {
+  return S.templates.find(t=>t.code==='univerzal') || S.templates[0] || {code:'univerzal', name:'Univerzál'};
+}
+
 function renderCompanyTiles() {
   const wrap = el('company-tiles'); wrap.innerHTML='';
   S.companies.forEach(c => {
@@ -1201,38 +1205,20 @@ function renderCompanyTiles() {
     t.className = 'tile' + (S.selCompany?.code===c.code?' selected':'');
     t.innerHTML = esc(c.name)+'<small style="display:block;font-weight:400;font-size:11px;color:var(--muted)">'+esc(c.code)+'</small>';
     t.addEventListener('click', () => {
-      S.selCompany=c; S.selTemplate=null;
+      S.selCompany=c; S.selTemplate=pickUniversalTemplate(); S.cloneData=null;
       document.querySelectorAll('#company-tiles .tile').forEach(x=>x.classList.remove('selected')); t.classList.add('selected');
-      el('step-template').classList.remove('hidden');
-      el('step-form').classList.add('hidden'); el('step-result').classList.add('hidden');
-      renderTemplateTiles();
+      el('view-order').classList.add('hidden'); el('step-result').classList.add('hidden');
+      buildForm(S.selTemplate);
+      el('step-form').classList.remove('hidden');
+      el('step-form').scrollIntoView({behavior:'smooth'});
     });
     wrap.appendChild(t);
   });
   if (S.companies.length===1) wrap.firstChild?.click();
 }
 
-function renderTemplateTiles() {
-  const wrap = el('template-tiles'); wrap.innerHTML='';
-  S.templates.forEach(tpl => {
-    const t = document.createElement('div');
-    t.className = 'tile' + (S.selTemplate?.code===tpl.code?' selected':'');
-    t.textContent = tpl.name;
-    t.addEventListener('click', () => {
-      S.selTemplate=tpl; S.cloneData=null;
-      document.querySelectorAll('#template-tiles .tile').forEach(x=>x.classList.remove('selected')); t.classList.add('selected');
-      el('view-order').classList.add('hidden'); el('step-result').classList.add('hidden');
-      buildForm(tpl);
-      el('step-form').classList.remove('hidden');
-      el('step-form').scrollIntoView({behavior:'smooth'});
-    });
-    wrap.appendChild(t);
-  });
-}
-
 el('back-btn').addEventListener('click', () => {
   el('step-form').classList.add('hidden');
-  document.querySelectorAll('#template-tiles .tile').forEach(t=>t.classList.remove('selected'));
   S.selTemplate=null;
 });
 
@@ -1318,10 +1304,12 @@ function recalcTotal() {
 }
 
 // Datalists
+function zLabel(z) { return z.nazov ? (z.cislo+' - '+z.nazov) : z.cislo; }
+
 function buildDatalists() {
   const zdl=el('zakazky-list'); zdl.innerHTML=''; S.zakazkyMap.clear();
   S.zakazky.forEach(z=>{
-    const lbl=z.cislo+' - '+z.nazov; S.zakazkyMap.set(lbl,z);
+    const lbl=zLabel(z); S.zakazkyMap.set(lbl,z);
     const o=document.createElement('option'); o.value=lbl; zdl.appendChild(o);
   });
   const sdl=el('suppliers-list'); sdl.innerHTML=''; S.supplierMap.clear();
@@ -1329,6 +1317,25 @@ function buildDatalists() {
     const lbl=s.name+' (IČO '+(s.ico||'—')+')'; S.supplierMap.set(lbl,s);
     const o=document.createElement('option'); o.value=lbl; sdl.appendChild(o);
   });
+}
+
+// Zákazka môže byť buď vybraná zo zoznamu, alebo zadaná ako voľný text v tvare
+// "číslo - názov" alebo len ako samotný text (napr. "Balíčky"). Ak zadaný text
+// nezodpovedá existujúcej zákazke, appka ju automaticky založí.
+async function resolveZakazka(raw) {
+  let z = S.zakazkyMap.get(raw);
+  if (z) return z;
+  let cislo, nazov;
+  const sepIdx = raw.indexOf(' - ');
+  if (sepIdx > -1) { cislo = raw.slice(0,sepIdx).trim(); nazov = raw.slice(sepIdx+3).trim()||null; }
+  else { cislo = raw; nazov = null; }
+  z = S.zakazky.find(x=>x.cislo===cislo);
+  if (z) return z;
+  const {data:ins, error:ze} = await supabaseClient.from('zakazky').insert({cislo,nazov,aktivna:true}).select().single();
+  if (ze) throw ze;
+  S.zakazky.push(ins);
+  buildDatalists();
+  return ins;
 }
 
 el('zakazka-input').addEventListener('input',()=>{el('zakazka-input').classList.remove('invalid');setErr('err-zakazka','');});
@@ -1364,8 +1371,9 @@ el('order-form').addEventListener('submit', async e => {
   if(!orderDate){setErr('err-order-date','Vyplňte dátum vystavenia.');ok=false;}
   else setErr('err-order-date','');
 
-  const zakazka=S.zakazkyMap.get(el('zakazka-input').value.trim());
-  if(!zakazka){el('zakazka-input').classList.add('invalid');setErr('err-zakazka','Vyberte zákazku zo zoznamu.');ok=false;}
+  const zakazkaRaw = el('zakazka-input').value.trim();
+  if(!zakazkaRaw){el('zakazka-input').classList.add('invalid');setErr('err-zakazka','Vyplňte internú zákazku.');ok=false;}
+  else setErr('err-zakazka','');
 
   const isNew=el('new-supplier-toggle').checked;
   let supplier=null, newSupData=null;
@@ -1415,6 +1423,9 @@ el('order-form').addEventListener('submit', async e => {
         if(ie){ el('form-error').textContent='Chyba: '+ie.message; el('form-error').classList.remove('hidden'); el('submit-btn').disabled=false; return; }
         supplier=ins; S.suppliers.push(ins); buildDatalists();
       }
+      let zakazka;
+      try { zakazka = await resolveZakazka(zakazkaRaw); }
+      catch(ze){ el('form-error').textContent='Chyba pri zákazke: '+ze.message; el('form-error').classList.remove('hidden'); el('submit-btn').disabled=false; return; }
       const snap={name:supplier.name,address:supplier.address,zip:supplier.zip,city:supplier.city,
         ico:supplier.ico,dic:supplier.dic,contact_person:supplier.contact_person,phone:supplier.phone,email:supplier.email};
       const {data:updOrder, error:ue} = await supabaseClient.rpc('update_order', {
@@ -1447,7 +1458,7 @@ el('order-form').addEventListener('submit', async e => {
       S.editingOrder = null;
       // Reset form UI
       el('form-edit-badge').classList.add('hidden');
-      el('form-title').textContent='3. Vyplňte objednávku';
+      el('form-title').textContent='2. Vyplňte objednávku';
       el('submit-btn').textContent='Vystaviť objednávku';
       el('back-btn').classList.remove('hidden');
       el('cancel-edit-btn').classList.add('hidden');
@@ -1468,6 +1479,9 @@ el('order-form').addEventListener('submit', async e => {
       }
       supplier=ins; S.suppliers.push(ins); buildDatalists();
     }
+    let zakazka;
+    try { zakazka = await resolveZakazka(zakazkaRaw); }
+    catch(ze){ el('form-error').textContent='Chyba pri zákazke: '+ze.message; el('form-error').classList.remove('hidden'); el('submit-btn').disabled=false; return; }
     const snap={name:supplier.name,address:supplier.address,zip:supplier.zip,city:supplier.city,
       ico:supplier.ico,dic:supplier.dic,contact_person:supplier.contact_person,
       phone:supplier.phone,email:supplier.email};
@@ -2150,7 +2164,7 @@ function startEdit(order, items) {
   order.attachment_note ? el('attachment-note-wrap').classList.remove('hidden') : el('attachment-note-wrap').classList.add('hidden');
 
   const z = S.zakazky.find(z=>z.cislo===order.zakazka_cislo);
-  if (z) el('zakazka-input').value = z.cislo+' - '+z.nazov;
+  if (z) el('zakazka-input').value = zLabel(z);
   el('zakazka-input').classList.remove('invalid');
 
   const sup = order.supplier_snapshot;
