@@ -2122,8 +2122,11 @@ el('cancel-edit-btn').addEventListener('click', () => {
 });
 
 function startEdit(order, items) {
-  if (order.status !== 'vystavena') {
-    alert('Editovať sa dá len objednávka v stave "Vystavená". Objednávka v schvaľovacom procese sa nedá meniť.');
+  const isCreator = order.created_by === S.profile.id;
+  const canEdit = order.status === 'vystavena'
+    || (order.status === 'schvalena_L1' && isCreator && !order.pending_approver_id);
+  if (!canEdit) {
+    alert('Editovať sa dá len objednávka v stave "Vystavená" (alebo vlastná objednávka vedúceho v stave "Schválená L1", kým ešte nebola odoslaná riaditeľovi). Objednávka v schvaľovacom procese sa nedá meniť.');
     return;
   }
   S.editingOrder = order;
