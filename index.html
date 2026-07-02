@@ -1999,6 +1999,7 @@ body{font-family:Calibri,Arial,sans-serif;font-size:11px;padding:12mm 15mm;displ
 .item-row.text-row{padding:6px 6px;line-height:1.5;}
 
 .items-filler{flex:1;}
+.billing-attach-block{margin-top:1.4em;padding:0 6px;text-align:center;font-size:10px;line-height:1.6;}
 .items-footnote{font-size:9.5px;padding:6px;border-top:1px solid #ccc;line-height:1.55;}
 
 .total-row{display:flex;justify-content:flex-end;align-items:center;gap:6px;margin:5px 0 10px;font-size:11px;font-weight:bold;}
@@ -2090,11 +2091,13 @@ body{font-family:Calibri,Arial,sans-serif;font-size:11px;padding:12mm 15mm;displ
     </div>
     ${introText?`<div class="item-row text-row">${introText}</div>`:''}
     ${itemsHtml}
+    ${(order.billing_note||order.attachment_note)?`<div class="billing-attach-block">
+      ${order.billing_note?`<div>${esc(order.billing_note).replace(/\n/g,'<br/>')}</div>`:''}
+      ${order.attachment_note?`<div>Prílohy: <b>${esc(order.attachment_note)}</b></div>`:''}
+    </div>`:''}
     <div class="items-filler"></div>
     <div class="items-footnote">
-      ${order.billing_note?`${esc(order.billing_note).replace(/\n/g,'<br/>')}<br/>`:''}
       <b>Faktúru pošlite na adresu:</b> ${esc(comp.name)}, ${esc(comp.address)}, ${esc(comp.zip)} ${esc(comp.city)} &nbsp;|&nbsp; ${esc(comp.email)} &nbsp;|&nbsp; Splatnosť faktúry: ${dueDays} dní od dodania
-      ${order.attachment_note?`<br/><b>Prílohy:</b> ${esc(order.attachment_note)}`:''}
     </div>
   </div>
 </div>
