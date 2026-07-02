@@ -1925,7 +1925,7 @@ async function printOrder(order, items) {
     const {data:stamp} = await supabaseClient.from('company_stamps')
       .select('*').eq('company_code', order.company_code).maybeSingle();
     if (stamp) {
-      stampHtml = `<img src="data:image/png;base64,${stamp.stamp_b64}" style="max-height:122px;max-width:210px;position:absolute;right:6px;bottom:0;opacity:0.95;filter:contrast(1.6) brightness(0.75) saturate(1.2);mix-blend-mode:multiply;"/>`;
+      stampHtml = `<img src="data:image/png;base64,${stamp.stamp_b64}" style="max-height:122px;max-width:210px;position:absolute;left:50%;top:52%;transform:translate(-50%,-50%);z-index:1;opacity:0.95;filter:contrast(1.6) brightness(0.75) saturate(1.2);mix-blend-mode:multiply;"/>`;
     }
   }
 
@@ -2017,8 +2017,9 @@ body{font-family:Calibri,Arial,sans-serif;font-size:11px;padding:12mm 15mm;displ
 .date-box{min-height:20px;}
 
 .appr-row{display:grid;grid-template-columns:1.5fr 0.8fr;gap:10px;margin-top:1px;}
-.appr-box{min-height:150px;font-size:9.5px;}
-.appr-lvl{margin-bottom:3px;position:relative;}
+.appr-box{min-height:145px;font-size:9.5px;}
+.appr-cols{display:grid;grid-template-columns:1fr 1fr;gap:10px;position:relative;z-index:2;}
+.appr-lvl{position:relative;}
 .appr-lvl .lvl{font-weight:bold;margin-bottom:1px;}
 
 .right-col{display:flex;flex-direction:column;gap:5px;}
@@ -2124,15 +2125,17 @@ body{font-family:Calibri,Arial,sans-serif;font-size:11px;padding:12mm 15mm;displ
 <div class="appr-row">
   <div class="box appr-box" style="position:relative;">
     <div class="box-label">Schválenie</div>
-    <div class="appr-lvl">
-      <div class="lvl">1. úroveň — vedúci strediska</div>
-      ${sigL1Html}
-    </div>
-    <div class="appr-lvl">
-      <div class="lvl">2. úroveň — riaditeľ</div>
-      ${sigL2Html}
-    </div>
     ${stampHtml}
+    <div class="appr-cols">
+      <div class="appr-lvl">
+        <div class="lvl">1. úroveň — vedúci strediska</div>
+        ${sigL1Html}
+      </div>
+      <div class="appr-lvl">
+        <div class="lvl">2. úroveň — riaditeľ</div>
+        ${sigL2Html}
+      </div>
+    </div>
   </div>
   <div class="right-col">
     <div class="meta-box">
