@@ -431,14 +431,6 @@ td.total-cell{text-align:right;font-weight:600;white-space:nowrap;}
               <label>Text "Objednávame si u Vás:"</label>
               <textarea id="intro-text" rows="3"></textarea>
             </div>
-            <div class="full hidden" id="billing-note-wrap">
-              <label>Text o fakturácii</label>
-              <textarea id="billing-note" rows="2"></textarea>
-            </div>
-            <div class="full hidden" id="attachment-note-wrap">
-              <label>Prílohy</label>
-              <input id="attachment-note"/>
-            </div>
           </div>
 
           <h3 style="margin:14px 0 6px;">Položky objednávky</h3>
@@ -453,6 +445,25 @@ td.total-cell{text-align:right;font-weight:600;white-space:nowrap;}
           </table>
           <div class="field-error" id="err-items"></div>
           <button type="button" class="secondary" id="add-item-btn" style="margin-top:6px;font-size:12px;">+ Pridať položku</button>
+
+          <div style="margin:18px 0 10px;border-top:1px solid var(--border);"></div>
+
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button type="button" class="secondary" id="add-billing-note-btn" style="font-size:12px;">+ Pridať text</button>
+            <button type="button" class="secondary" id="add-attachment-btn" style="font-size:12px;">+ Pridať prílohy</button>
+          </div>
+
+          <div class="form-grid" style="margin-top:10px;">
+            <div class="full hidden" id="billing-note-wrap">
+              <label>Text o fakturácii <button type="button" class="link-btn" id="remove-billing-note-btn" style="float:right;color:var(--danger,#c0392b);background:none;border:none;cursor:pointer;font-size:12px;">✕ odstrániť</button></label>
+              <textarea id="billing-note" rows="2"></textarea>
+            </div>
+            <div class="full hidden" id="attachment-note-wrap">
+              <label>Prílohy <button type="button" class="link-btn" id="remove-attachment-btn" style="float:right;color:var(--danger,#c0392b);background:none;border:none;cursor:pointer;font-size:12px;">✕ odstrániť</button></label>
+              <input list="attachments-list" id="attachment-note" placeholder="Vyberte zo zoznamu alebo napíšte nový text..." autocomplete="off"/>
+              <datalist id="attachments-list"></datalist>
+            </div>
+          </div>
 
           <div class="form-grid" style="margin-top:14px;">
             <div>
@@ -711,18 +722,20 @@ async function init(user) {
 
 // ── LOAD DATA ──────────────────────────────────────────────────────────
 async function loadAll() {
-  const [cR,tR,sR,zR,oR] = await Promise.all([
+  const [cR,tR,sR,zR,oR,aR] = await Promise.all([
     supabaseClient.from('companies').select('*'),
     supabaseClient.from('order_templates').select('*').order('sort_order'),
     supabaseClient.from('suppliers').select('*').eq('is_active',true).order('name'),
     supabaseClient.from('zakazky').select('*').eq('aktivna',true).order('cislo'),
-    supabaseClient.from('orders').select('*').order('sequence_number',{ascending:false})
+    supabaseClient.from('orders').select('*').order('sequence_number',{ascending:false}),
+    supabaseClient.from('attachment_options').select('*').eq('aktivna',true).order('text')
   ]);
   S.companies = (cR.data||[]).filter(c=>(S.profile.allowed_company_codes||[]).includes(c.code));
   S.templates = tR.data||[];
   S.suppliers = sR.data||[];
   S.zakazky = zR.data||[];
   S.orders = oR.data||[];
+  S.attachmentOptions = aR.data||[];
   buildDatalists();
   renderCompanyTiles();
   renderSidebar();
@@ -1171,8 +1184,8 @@ function cloneOrder(order, items) {
   el('invoice-due-days').value = order.invoice_due_days ?? comp?.invoice_due_days ?? 45;
   const pm = document.querySelector(`input[name="payment"][value="${order.payment_method}"]`);
   if (pm) pm.checked = true;
-  if (tpl?.billing_note) el('billing-note-wrap').classList.remove('hidden');
-  if (order.attachment_note) el('attachment-note-wrap').classList.remove('hidden');
+  if (order.billing_note) el('billing-note-wrap').classList.remove('hidden'); else el('billing-note-wrap').classList.add('hidden');
+  if (order.attachment_note) el('attachment-note-wrap').classList.remove('hidden'); else el('attachment-note-wrap').classList.add('hidden');
 
   const z = S.zakazky.find(z=>z.cislo===order.zakazka_cislo);
   if (z) el('zakazka-input').value = zLabel(z);
@@ -1233,10 +1246,10 @@ function buildForm(tpl) {
   el('new-supplier-fields').classList.add('hidden');
   el('supplier-input').disabled=false;
   el('intro-text').value=tpl.default_intro_text||'';
-  tpl.billing_note ? el('billing-note-wrap').classList.remove('hidden') : el('billing-note-wrap').classList.add('hidden');
-  el('billing-note').value=tpl.billing_note||'';
-  tpl.default_attachment ? el('attachment-note-wrap').classList.remove('hidden') : el('attachment-note-wrap').classList.add('hidden');
-  el('attachment-note').value=tpl.default_attachment||'';
+  el('billing-note-wrap').classList.add('hidden');
+  el('billing-note').value='';
+  el('attachment-note-wrap').classList.add('hidden');
+  el('attachment-note').value='';
   el('order-date').value=today();
   syncDeliveryDateMin();
   el('delivery-date').value='';
@@ -1304,6 +1317,8 @@ function recalcTotal() {
 }
 
 // Datalists
+const DEFAULT_BILLING_NOTE = 'Fakturácia bude vykonaná na základe skutočne vykonaných prác podľa cenníka SUPTel s.r.o.';
+
 function zLabel(z) { return z.nazov ? (z.cislo+' - '+z.nazov) : z.cislo; }
 
 function buildDatalists() {
@@ -1317,7 +1332,39 @@ function buildDatalists() {
     const lbl=s.name+' (IČO '+(s.ico||'—')+')'; S.supplierMap.set(lbl,s);
     const o=document.createElement('option'); o.value=lbl; sdl.appendChild(o);
   });
+  const adl=el('attachments-list'); adl.innerHTML='';
+  (S.attachmentOptions||[]).forEach(a=>{
+    const o=document.createElement('option'); o.value=a.text; adl.appendChild(o);
+  });
 }
+
+// Ak zadaný text príloh ešte nie je v číselníku, potichu ho tam pridá pre budúce použitie.
+// Nie je to kritické pre uloženie objednávky, preto chyba tu nič nezastaví.
+async function rememberAttachmentOption(text) {
+  if (!text) return;
+  if ((S.attachmentOptions||[]).some(a=>a.text===text)) return;
+  try {
+    const {data:ins,error:ae} = await supabaseClient.from('attachment_options').insert({text, aktivna:true}).select().single();
+    if (!ae && ins) { S.attachmentOptions.push(ins); buildDatalists(); }
+  } catch(e) { /* best effort, ignorovať */ }
+}
+
+el('add-billing-note-btn').addEventListener('click', () => {
+  const wrap = el('billing-note-wrap');
+  wrap.classList.remove('hidden');
+  if (!el('billing-note').value.trim()) el('billing-note').value = DEFAULT_BILLING_NOTE;
+  el('billing-note').focus();
+});
+el('remove-billing-note-btn').addEventListener('click', () => {
+  el('billing-note').value=''; el('billing-note-wrap').classList.add('hidden');
+});
+el('add-attachment-btn').addEventListener('click', () => {
+  el('attachment-note-wrap').classList.remove('hidden');
+  el('attachment-note').focus();
+});
+el('remove-attachment-btn').addEventListener('click', () => {
+  el('attachment-note').value=''; el('attachment-note-wrap').classList.add('hidden');
+});
 
 // Zákazka môže byť buď vybraná zo zoznamu, alebo zadaná ako voľný text v tvare
 // "číslo - názov" alebo len ako samotný text (napr. "Balíčky"). Ak zadaný text
@@ -1428,6 +1475,7 @@ el('order-form').addEventListener('submit', async e => {
       catch(ze){ el('form-error').textContent='Chyba pri zákazke: '+ze.message; el('form-error').classList.remove('hidden'); el('submit-btn').disabled=false; return; }
       const snap={name:supplier.name,address:supplier.address,zip:supplier.zip,city:supplier.city,
         ico:supplier.ico,dic:supplier.dic,contact_person:supplier.contact_person,phone:supplier.phone,email:supplier.email};
+      rememberAttachmentOption(el('attachment-note').value.trim());
       const {data:updOrder, error:ue} = await supabaseClient.rpc('update_order', {
         p_order_id:       S.editingOrder.id,
         p_template_code:  S.selTemplate.code,
@@ -1485,6 +1533,7 @@ el('order-form').addEventListener('submit', async e => {
     const snap={name:supplier.name,address:supplier.address,zip:supplier.zip,city:supplier.city,
       ico:supplier.ico,dic:supplier.dic,contact_person:supplier.contact_person,
       phone:supplier.phone,email:supplier.email};
+    rememberAttachmentOption(el('attachment-note').value.trim());
 
     const {data:order,error:oe}=await supabaseClient.rpc('create_order',{
       p_company_code:S.selCompany.code,
@@ -2163,7 +2212,7 @@ function startEdit(order, items) {
   const pm = document.querySelector(`input[name="payment"][value="${order.payment_method}"]`);
   if (pm) pm.checked = true;
 
-  tpl.billing_note ? el('billing-note-wrap').classList.remove('hidden') : el('billing-note-wrap').classList.add('hidden');
+  order.billing_note ? el('billing-note-wrap').classList.remove('hidden') : el('billing-note-wrap').classList.add('hidden');
   order.attachment_note ? el('attachment-note-wrap').classList.remove('hidden') : el('attachment-note-wrap').classList.add('hidden');
 
   const z = S.zakazky.find(z=>z.cislo===order.zakazka_cislo);
