@@ -1378,11 +1378,31 @@ async function resolveZakazka(raw) {
   else { cislo = raw; nazov = null; }
   z = S.zakazky.find(x=>x.cislo===cislo);
   if (z) return z;
-  const {data:ins, error:ze} = await supabaseClient.from('zakazky').insert({cislo,nazov,aktivna:true}).select().single();
-  if (ze) throw ze;
-  S.zakazky.push(ins);
+
+  // Zákazka s týmto číslom môže v DB už existovať (napr. bola predtým deaktivovaná
+  // pri "vyprázdnení" číselníka), len ju appka nevidí, lebo RLS na SELECT ukazuje
+  // len aktivna=true. Preto sa najprv NEPÝTAME SELECT-om (ten by skrytú zákazku
+  // nenašiel), ale rovno skúsime UPDATE - ak nejaký riadok trafí, len sa reaktivuje;
+  // ak netrafí žiadny (naozaj neexistuje), až potom založíme nový cez INSERT.
+  const patch = {aktivna:true};
+  if (nazov) patch.nazov = nazov;
+  let {data:result, error:err} = await supabaseClient.from('zakazky')
+    .update(patch).eq('cislo',cislo).select().maybeSingle();
+  if (err) throw err;
+
+  if (!result) {
+    ({data:result, error:err} = await supabaseClient.from('zakazky').insert({cislo,nazov,aktivna:true}).select().single());
+    if (err) {
+      // Pretekový prípad (napr. dvaja naraz) - keby aj tak nastal konflikt kľúča, skús ešte raz update.
+      if (err.code === '23505') {
+        ({data:result, error:err} = await supabaseClient.from('zakazky').update(patch).eq('cislo',cislo).select().maybeSingle());
+      }
+      if (err || !result) throw err || new Error('Zákazku sa nepodarilo založiť ani nájsť.');
+    }
+  }
+  S.zakazky.push(result);
   buildDatalists();
-  return ins;
+  return result;
 }
 
 el('zakazka-input').addEventListener('input',()=>{el('zakazka-input').classList.remove('invalid');setErr('err-zakazka','');});
