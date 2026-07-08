@@ -525,6 +525,16 @@ td.total-cell{text-align:right;font-weight:600;white-space:nowrap;}
         </div>
         <div id="admin-error" class="banner error hidden"></div>
 
+        <!-- Systémové nastavenia -->
+        <div style="border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;background:#fafbfc;margin-bottom:20px;">
+          <h3 style="margin:0 0 8px;font-size:14px;">Systémové nastavenia</h3>
+          <label style="display:flex;align-items:center;gap:8px;font-weight:400;">
+            <input type="checkbox" id="setting-emails-enabled" style="width:auto;"/>
+            Automatické emailové notifikácie (schválenie, vrátenie, zamietnutie...)
+          </label>
+          <small id="setting-emails-hint" style="color:var(--muted);display:block;margin-top:4px;"></small>
+        </div>
+
         <!-- Zoznam používateľov -->
         <div id="admin-user-list" style="margin-bottom:20px;"></div>
 
@@ -722,13 +732,14 @@ async function init(user) {
 
 // ── LOAD DATA ──────────────────────────────────────────────────────────
 async function loadAll() {
-  const [cR,tR,sR,zR,oR,aR] = await Promise.all([
+  const [cR,tR,sR,zR,oR,aR,stR] = await Promise.all([
     supabaseClient.from('companies').select('*'),
     supabaseClient.from('order_templates').select('*').order('sort_order'),
     supabaseClient.from('suppliers').select('*').eq('is_active',true).order('name'),
     supabaseClient.from('zakazky').select('*').eq('aktivna',true).order('cislo'),
     supabaseClient.from('orders').select('*').order('sequence_number',{ascending:false}),
-    supabaseClient.from('attachment_options').select('*').eq('aktivna',true).order('text')
+    supabaseClient.from('attachment_options').select('*').eq('aktivna',true).order('text'),
+    supabaseClient.from('app_settings').select('*')
   ]);
   S.companies = (cR.data||[]).filter(c=>(S.profile.allowed_company_codes||[]).includes(c.code));
   S.templates = tR.data||[];
@@ -736,11 +747,17 @@ async function loadAll() {
   S.zakazky = zR.data||[];
   S.orders = oR.data||[];
   S.attachmentOptions = aR.data||[];
+  S.settings = {};
+  (stR.data||[]).forEach(s=>{ S.settings[s.key] = s.value; });
   buildDatalists();
   renderCompanyTiles();
   renderSidebar();
   renderDashboard();
   showStep('dashboard-view');
+}
+
+function emailsEnabled() {
+  return S.settings?.emails_enabled === 'true';
 }
 
 // ── SIDEBAR ────────────────────────────────────────────────────────────
@@ -2410,16 +2427,14 @@ async function loadApprovalPanel(order) {
   }
 }
 
-// ── DOČASNE VYPNUTÉ AUTOMATICKÉ ODOSIELANIE MAILOV ──────────────────────────
-// Kým sa nenájde príčina zablokovania SMTP schránky brigant@suptel.sk, appka
-// maily fyzicky neposiela (Edge Function send-notification sa vôbec nevolá).
-// Všetko ostatné (vystavovanie, schvaľovanie, chat...) funguje normálne ďalej.
-// Späť zapneš nastavením EMAILS_ENABLED = true.
-const EMAILS_ENABLED = false;
-
+// ── AUTOMATICKÉ EMAILOVÉ NOTIFIKÁCIE ─────────────────────────────────────
+// Zapína/vypína sa cez checkbox v "⚙ Správa používateľov" (uložené v tabuľke
+// app_settings, kľúč 'emails_enabled'). Keď je vypnuté, appka sa vôbec
+// nepokúsi zavolať Edge Function send-notification (teda ani sa neprihlási
+// do SMTP) - všetko ostatné (vystavovanie, schvaľovanie, chat...) funguje ďalej.
 async function sendNotification(type, toEmail, toName, orderNumber, senderName, note) {
-  if (!EMAILS_ENABLED) {
-    console.info('sendNotification: automatické maily sú dočasne vypnuté (EMAILS_ENABLED=false) - "'+type+'" pre '+toEmail+' sa neodoslal.');
+  if (!emailsEnabled()) {
+    console.info('sendNotification: automatické maily sú vypnuté (Správa používateľov → Systémové nastavenia) - "'+type+'" pre '+toEmail+' sa neodoslal.');
     return;
   }
   if (!toEmail) {
@@ -2650,11 +2665,35 @@ el('admin-btn').addEventListener('click', async () => {
   el('admin-panel').classList.remove('hidden');
   el('admin-form-wrap').classList.add('hidden');
   el('admin-error').classList.add('hidden');
+  renderSystemSettings();
   await loadAdminUserList();
   buildCompanyCheckboxes(null);
   await renderSignaturesAdmin();
   await renderStampsAdmin();
   await renderSuppliersAdmin();
+});
+
+function renderSystemSettings() {
+  const cb = el('setting-emails-enabled');
+  cb.checked = emailsEnabled();
+  el('setting-emails-hint').textContent = cb.checked
+    ? 'Zapnuté - pri schválení/vrátení/zamietnutí objednávky sa odosiela email.'
+    : 'Vypnuté - žiadne automatické emaily sa neodosielajú (appka sa vôbec nepokúša pripojiť na SMTP).';
+}
+
+el('setting-emails-enabled').addEventListener('change', async function() {
+  const val = this.checked ? 'true' : 'false';
+  this.disabled = true;
+  const {error} = await supabaseClient.from('app_settings')
+    .upsert({key:'emails_enabled', value:val}, {onConflict:'key'});
+  this.disabled = false;
+  if (error) {
+    alert('Nepodarilo sa uložiť nastavenie: '+error.message);
+    this.checked = !this.checked;
+    return;
+  }
+  S.settings.emails_enabled = val;
+  renderSystemSettings();
 });
 
 async function loadAdminUserList() {
