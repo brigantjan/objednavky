@@ -126,6 +126,10 @@ td.total-cell{text-align:right;font-weight:600;white-space:nowrap;}
         <button class="new-order-btn" id="dashboard-btn" style="background:#1f5fa8;margin:0 0 6px;">🏠 Prehľad</button>
         <button class="new-order-btn" id="reports-btn" style="background:#6b7785;margin:0 0 8px;">📊 Štatistiky / Vyhľadávanie</button>
         <h3>Vystavené objednávky</h3>
+        <div id="sidebar-filter-toggle" style="display:flex;gap:0;margin-bottom:8px;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
+          <button type="button" id="sidebar-filter-all" style="flex:1;border:none;padding:5px 4px;font-size:11.5px;cursor:pointer;background:#1f5fa8;color:#fff;">Všetky na stredisku</button>
+          <button type="button" id="sidebar-filter-mine" style="flex:1;border:none;padding:5px 4px;font-size:11.5px;cursor:pointer;background:#eee;color:#333;">Iba moje</button>
+        </div>
         <input class="sidebar-search" id="sidebar-search" placeholder="Číslo / dodávateľ / zákazka..." type="search"/>
       </div>
       <div class="sidebar-list" id="sidebar-list">
@@ -668,7 +672,7 @@ const S = {
   zakazkyMap:new Map(),supplierMap:new Map(),
   selCompany:null,selTemplate:null,
   lastOrder:null,lastItems:[],
-  orders:[],viewOrder:null,viewItems:[],cloneData:null
+  orders:[],viewOrder:null,viewItems:[],cloneData:null,sidebarFilter:'all'
 };
 
 const el = id => document.getElementById(id);
@@ -749,6 +753,7 @@ async function loadAll() {
   S.attachmentOptions = aR.data||[];
   S.settings = {};
   (stR.data||[]).forEach(s=>{ S.settings[s.key] = s.value; });
+  el('sidebar-filter-all').textContent = (S.profile.is_admin || S.profile.approval_level===2) ? 'Všetky objednávky' : 'Všetky na stredisku';
   buildDatalists();
   renderCompanyTiles();
   renderSidebar();
@@ -764,7 +769,10 @@ function emailsEnabled() {
 function renderSidebar(q) {
   q = (q||'').toLowerCase().trim();
   const list = el('sidebar-list');
-  const filtered = S.orders.filter(o =>
+  const base = (S.sidebarFilter === 'mine')
+    ? S.orders.filter(o => o.created_by === S.profile.id)
+    : S.orders;
+  const filtered = base.filter(o =>
     !q || o.order_number.toLowerCase().includes(q)
       || (o.supplier_snapshot?.name||'').toLowerCase().includes(q)
       || (o.zakazka_cislo||'').toLowerCase().includes(q)
@@ -786,6 +794,19 @@ function renderSidebar(q) {
     list.appendChild(d);
   });
 }
+
+el('sidebar-filter-all').addEventListener('click', () => {
+  S.sidebarFilter = 'all';
+  el('sidebar-filter-all').style.background = '#1f5fa8'; el('sidebar-filter-all').style.color = '#fff';
+  el('sidebar-filter-mine').style.background = '#eee'; el('sidebar-filter-mine').style.color = '#333';
+  renderSidebar(el('sidebar-search').value);
+});
+el('sidebar-filter-mine').addEventListener('click', () => {
+  S.sidebarFilter = 'mine';
+  el('sidebar-filter-mine').style.background = '#1f5fa8'; el('sidebar-filter-mine').style.color = '#fff';
+  el('sidebar-filter-all').style.background = '#eee'; el('sidebar-filter-all').style.color = '#333';
+  renderSidebar(el('sidebar-search').value);
+});
 
 el('sidebar-search').addEventListener('input', e => renderSidebar(e.target.value));
 
@@ -982,7 +1003,7 @@ async function renderDashboard() {
             <span style="color:var(--muted);"> · ${it.text}</span>
           </div>
           <div style="font-size:12px;color:var(--muted);margin-top:2px;">
-            ${esc(sup)}${o.total_amount?' · '+fmt(o.total_amount):''}${it.detail?' · '+esc(it.detail):''}
+            ${esc(sup)}${o.total_amount?' · '+fmt(o.total_amount):''}${it.detail?' · '+esc(it.detail):''}${o.updated_at?' · '+fmtDateTime(o.updated_at):''}
           </div>
         </div>
         <i class="ti ti-chevron-right" style="font-size:16px;color:var(--muted);flex-shrink:0;margin-top:3px;"></i>
