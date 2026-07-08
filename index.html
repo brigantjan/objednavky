@@ -2410,7 +2410,18 @@ async function loadApprovalPanel(order) {
   }
 }
 
+// ── DOČASNE VYPNUTÉ AUTOMATICKÉ ODOSIELANIE MAILOV ──────────────────────────
+// Kým sa nenájde príčina zablokovania SMTP schránky brigant@suptel.sk, appka
+// maily fyzicky neposiela (Edge Function send-notification sa vôbec nevolá).
+// Všetko ostatné (vystavovanie, schvaľovanie, chat...) funguje normálne ďalej.
+// Späť zapneš nastavením EMAILS_ENABLED = true.
+const EMAILS_ENABLED = false;
+
 async function sendNotification(type, toEmail, toName, orderNumber, senderName, note) {
+  if (!EMAILS_ENABLED) {
+    console.info('sendNotification: automatické maily sú dočasne vypnuté (EMAILS_ENABLED=false) - "'+type+'" pre '+toEmail+' sa neodoslal.');
+    return;
+  }
   if (!toEmail) {
     console.warn('sendNotification: chýba toEmail - schvaľovateľ/vystavovateľ nemá v profile vyplnený email.');
     alert('Upozornenie: email sa neodoslal, pretože príjemca nemá v systéme vyplnenú emailovú adresu (pole "email" v profile). Skontrolujte to v Správe používateľov.');
