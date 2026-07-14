@@ -26,6 +26,12 @@ header.topbar .user-info{font-size:13px;display:flex;align-items:center;gap:10px
 .sidebar-header{padding:10px 12px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:6px;}
 .sidebar-header h3{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;}
 .sidebar-search{width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;}
+.autocomplete-dropdown{position:absolute;top:100%;left:0;right:0;z-index:50;background:#fff;border:1px solid var(--border);border-top:none;border-radius:0 0 var(--radius) var(--radius);max-height:260px;overflow-y:auto;box-shadow:0 4px 10px rgba(0,0,0,.08);}
+.autocomplete-dropdown .ac-item{padding:7px 10px;cursor:pointer;font-size:13px;border-bottom:1px solid #f0f0f0;}
+.autocomplete-dropdown .ac-item:last-child{border-bottom:none;}
+.autocomplete-dropdown .ac-item:hover,.autocomplete-dropdown .ac-item.active{background:#eef4fb;}
+.autocomplete-dropdown .ac-item small{display:block;color:var(--muted);font-size:11px;margin-top:1px;}
+.autocomplete-dropdown .ac-empty{padding:8px 10px;font-size:12.5px;color:var(--muted);}
 .sidebar-list{flex:1;overflow-y:auto;}
 .order-item{padding:9px 12px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s;}
 .order-item:hover{background:#f0f5ff;}
@@ -408,8 +414,10 @@ td.total-cell{text-align:right;font-weight:600;white-space:nowrap;}
 
             <div class="full">
               <label>Dodávateľ *</label>
-              <input list="suppliers-list" id="supplier-input" placeholder="Názov alebo IČO dodávateľa..." autocomplete="off"/>
-              <datalist id="suppliers-list"></datalist>
+              <div style="position:relative;">
+                <input id="supplier-input" placeholder="Píšte názov alebo IČO dodávateľa (min. 2 znaky)..." autocomplete="off"/>
+                <div id="supplier-results" class="autocomplete-dropdown hidden"></div>
+              </div>
               <div class="field-error" id="err-supplier"></div>
               <label style="margin-top:6px;font-weight:400;color:var(--text);">
                 <input type="checkbox" id="new-supplier-toggle" style="width:auto;"/>
@@ -736,10 +744,12 @@ async function init(user) {
 
 // ── LOAD DATA ──────────────────────────────────────────────────────────
 async function loadAll() {
-  const [cR,tR,sR,zR,oR,aR,stR] = await Promise.all([
+  // Dodávateľov (môže ich byť tisíce) už NEnaťahujeme naraz pri každom prihlásení -
+  // vyhľadávajú sa priebežne podľa písania (viď searchSuppliers()). S.suppliers tu
+  // preto zostáva prázdne, dopĺňa sa až ad-hoc pri vyhľadávaní/výbere/editácii.
+  const [cR,tR,zR,oR,aR,stR] = await Promise.all([
     supabaseClient.from('companies').select('*'),
     supabaseClient.from('order_templates').select('*').order('sort_order'),
-    supabaseClient.from('suppliers').select('*').eq('is_active',true).order('name'),
     supabaseClient.from('zakazky').select('*').eq('aktivna',true).order('cislo'),
     supabaseClient.from('orders').select('*').order('sequence_number',{ascending:false}),
     supabaseClient.from('attachment_options').select('*').eq('aktivna',true).order('text'),
@@ -747,7 +757,7 @@ async function loadAll() {
   ]);
   S.companies = (cR.data||[]).filter(c=>(S.profile.allowed_company_codes||[]).includes(c.code));
   S.templates = tR.data||[];
-  S.suppliers = sR.data||[];
+  S.suppliers = [];
   S.zakazky = zR.data||[];
   S.orders = oR.data||[];
   S.attachmentOptions = aR.data||[];
@@ -1197,7 +1207,7 @@ el('view-print-btn').addEventListener('click', () => printOrder(S.viewOrder, S.v
 el('view-clone-btn').addEventListener('click', () => cloneOrder(S.viewOrder, S.viewItems));
 
 // ── CLONE ───────────────────────────────────────────────────────────────
-function cloneOrder(order, items) {
+async function cloneOrder(order, items) {
   S.cloneData = {order, items};
   const comp = S.companies.find(c=>c.code===order.company_code);
   if (comp) { S.selCompany = comp; document.querySelectorAll('#company-tiles .tile').forEach(t=>t.classList.remove('selected')); }
@@ -1230,7 +1240,7 @@ function cloneOrder(order, items) {
 
   const sup = order.supplier_snapshot;
   if (sup) {
-    for (const [k,v] of S.supplierMap) { if (v.ico===sup.ico) { el('supplier-input').value=k; break; } }
+    el('supplier-input').value = await preloadSupplierForEdit(order.supplier_id, sup);
   }
 
   el('items-body').innerHTML = '';
@@ -1365,15 +1375,76 @@ function buildDatalists() {
     const lbl=zLabel(z); S.zakazkyMap.set(lbl,z);
     const o=document.createElement('option'); o.value=lbl; zdl.appendChild(o);
   });
-  const sdl=el('suppliers-list'); sdl.innerHTML=''; S.supplierMap.clear();
-  S.suppliers.forEach(s=>{
-    const lbl=s.name+' (IČO '+(s.ico||'—')+')'; S.supplierMap.set(lbl,s);
-    const o=document.createElement('option'); o.value=lbl; sdl.appendChild(o);
-  });
   const adl=el('attachments-list'); adl.innerHTML='';
   (S.attachmentOptions||[]).forEach(a=>{
     const o=document.createElement('option'); o.value=a.text; adl.appendChild(o);
   });
+}
+
+function supplierLabel(s) { return s.name+' (IČO '+(s.ico||'—')+')'; }
+
+// ── DODÁVATEĽ: vyhľadávanie priebežne podľa písania (nenačítava sa celý
+// číselník naraz - pri tisíckach dodávateľov by to zbytočne zaťažovalo appku
+// aj dátový prenos). Zhoda na názov ALEBO IČO, max 20 výsledkov.
+let _supplierSearchTimer = null;
+function scheduleSupplierSearch(q) {
+  clearTimeout(_supplierSearchTimer);
+  if (q.trim().length < 2) { hideSupplierResults(); return; }
+  _supplierSearchTimer = setTimeout(() => searchSuppliers(q.trim()), 250);
+}
+async function searchSuppliers(q) {
+  const {data, error} = await supabaseClient.from('suppliers')
+    .select('*').eq('is_active', true)
+    .or(`name.ilike.%${q}%,ico.ilike.%${q}%`)
+    .order('name').limit(20);
+  if (error) { console.warn('searchSuppliers error', error); return; }
+  renderSupplierResults(data || [], q);
+}
+function renderSupplierResults(results, q) {
+  const box = el('supplier-results');
+  if (!results.length) {
+    box.innerHTML = `<div class="ac-empty">Žiadny dodávateľ nezodpovedá "${esc(q)}". Skúste iné hľadané slovo, alebo zaškrtnite "Dodávateľ nie je v zozname".</div>`;
+    box.classList.remove('hidden');
+    return;
+  }
+  box.innerHTML = results.map(s => {
+    const lbl = supplierLabel(s);
+    S.supplierMap.set(lbl, s);
+    return `<div class="ac-item" data-lbl="${esc(lbl)}">${esc(s.name)}<small>IČO ${esc(s.ico||'—')}${s.city?' · '+esc(s.city):''}</small></div>`;
+  }).join('');
+  box.classList.remove('hidden');
+  box.querySelectorAll('.ac-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const lbl = item.getAttribute('data-lbl');
+      el('supplier-input').value = lbl;
+      hideSupplierResults();
+      el('supplier-input').classList.remove('invalid'); setErr('err-supplier','');
+    });
+  });
+}
+function hideSupplierResults() {
+  el('supplier-results').classList.add('hidden');
+  el('supplier-results').innerHTML = '';
+}
+el('supplier-input').addEventListener('input', () => {
+  el('supplier-input').classList.remove('invalid'); setErr('err-supplier','');
+  scheduleSupplierSearch(el('supplier-input').value);
+});
+document.addEventListener('click', e => {
+  if (!el('supplier-input').contains(e.target) && !el('supplier-results').contains(e.target)) hideSupplierResults();
+});
+
+// Prednačíta konkrétneho dodávateľa (podľa id) do vyhľadávacej mapy - používa sa
+// pri editácii/klonovaní objednávky, aby validácia pri uložení fungovala aj bez
+// toho, aby používateľ musel dodávateľa znova vyhľadať, ak ho nemení.
+async function preloadSupplierForEdit(supplierId, fallbackSnapshot) {
+  if (!supplierId) return fallbackSnapshot ? supplierLabel(fallbackSnapshot) : '';
+  const {data} = await supabaseClient.from('suppliers').select('*').eq('id', supplierId).maybeSingle();
+  const s = data || fallbackSnapshot;
+  if (!s) return '';
+  const lbl = supplierLabel(s);
+  if (data) S.supplierMap.set(lbl, data);
+  return lbl;
 }
 
 // Ak zadaný text príloh ešte nie je v číselníku, potichu ho tam pridá pre budúce použitie.
@@ -1444,9 +1515,8 @@ async function resolveZakazka(raw) {
 }
 
 el('zakazka-input').addEventListener('input',()=>{el('zakazka-input').classList.remove('invalid');setErr('err-zakazka','');});
-el('supplier-input').addEventListener('input',()=>{el('supplier-input').classList.remove('invalid');setErr('err-supplier','');});
 el('new-supplier-toggle').addEventListener('change',e=>{
-  if(e.target.checked){el('new-supplier-fields').classList.remove('hidden');el('supplier-input').disabled=true;el('supplier-input').value='';}
+  if(e.target.checked){el('new-supplier-fields').classList.remove('hidden');el('supplier-input').disabled=true;el('supplier-input').value='';hideSupplierResults();}
   else{el('new-supplier-fields').classList.add('hidden');el('supplier-input').disabled=false;}
 });
 
@@ -2234,7 +2304,7 @@ el('cancel-edit-btn').addEventListener('click', () => {
   openOrder(S.viewOrder);
 });
 
-function startEdit(order, items) {
+async function startEdit(order, items) {
   const isCreator = order.created_by === S.profile.id;
   const canEdit = order.status === 'vystavena'
     || (order.status === 'schvalena_L1' && isCreator && !order.pending_approver_id);
@@ -2288,7 +2358,7 @@ function startEdit(order, items) {
   el('new-supplier-fields').classList.add('hidden');
   el('supplier-input').disabled = false;
   if (sup) {
-    for (const [k,v] of S.supplierMap) { if (v.ico===sup.ico) { el('supplier-input').value=k; break; } }
+    el('supplier-input').value = await preloadSupplierForEdit(order.supplier_id, sup);
   }
   el('supplier-input').classList.remove('invalid');
 
@@ -3201,21 +3271,32 @@ window.__uploadStamp = async function(companyCode, file) {
 S.editingSupplierId = null;
 
 async function renderSuppliersAdmin(filterText) {
-  const q = (filterText||'').toLowerCase().trim();
-  const {data: suppliers, error} = await supabaseClient.from('suppliers').select('*').order('name');
+  const q = (filterText||'').trim();
+  el('admin-suppliers-list').innerHTML = '<div style="color:var(--muted);font-size:13px;">Načítavam...</div>';
+
+  // Dodávateľov môžu byť tisíce - v adminovi preto NEnaťahujeme celú tabuľku
+  // naraz, ale vždy len obmedzený výsledok (max 200), zoradený podľa mena,
+  // prípadne zúžený vyhľadávaním (názov alebo IČO).
+  let query = supabaseClient.from('suppliers').select('*').order('name').limit(200);
+  if (q) query = query.or(`name.ilike.%${q}%,ico.ilike.%${q}%`);
+  const {data: suppliers, error} = await query;
   if (error) {
     el('admin-suppliers-list').innerHTML = '<p style="color:var(--error);font-size:13px;">Chyba pri načítaní: '+esc(error.message)+'</p>';
     return;
   }
-  S.allSuppliers = suppliers || [];
-  const filtered = S.allSuppliers.filter(s => !q || s.name.toLowerCase().includes(q) || (s.ico||'').includes(q));
+  const filtered = suppliers || [];
+  S.allSuppliers = filtered;
 
   if (!filtered.length) {
-    el('admin-suppliers-list').innerHTML = '<p style="color:var(--muted);font-size:13px;">Žiadni dodávatelia</p>';
+    el('admin-suppliers-list').innerHTML = '<p style="color:var(--muted);font-size:13px;">Žiadni dodávatelia'+(q?' pre "'+esc(q)+'"':'')+'.</p>';
     return;
   }
 
-  el('admin-suppliers-list').innerHTML = `
+  const hint = filtered.length === 200
+    ? `<p style="color:var(--muted);font-size:12px;margin-bottom:6px;">Zobrazených prvých 200 výsledkov${q?' pre "'+esc(q)+'"':''} - pre konkrétneho dodávateľa radšej hľadajte podľa názvu alebo IČO.</p>`
+    : (q ? `<p style="color:var(--muted);font-size:12px;margin-bottom:6px;">${filtered.length} výsledkov pre "${esc(q)}"</p>` : '');
+
+  el('admin-suppliers-list').innerHTML = hint + `
     <table style="width:100%;border-collapse:collapse;font-size:13px;">
       <thead><tr style="background:#f0f3f7;">
         <th style="padding:6px 8px;text-align:left;border:1px solid var(--border);">Názov</th>
@@ -3240,7 +3321,12 @@ async function renderSuppliersAdmin(filterText) {
     </table>`;
 }
 
-el('admin-supplier-search').addEventListener('input', e => renderSuppliersAdmin(e.target.value));
+let _adminSupplierSearchTimer = null;
+el('admin-supplier-search').addEventListener('input', e => {
+  clearTimeout(_adminSupplierSearchTimer);
+  const val = e.target.value;
+  _adminSupplierSearchTimer = setTimeout(() => renderSuppliersAdmin(val), 250);
+});
 
 el('admin-supplier-add-btn').addEventListener('click', () => {
   S.editingSupplierId = null;
