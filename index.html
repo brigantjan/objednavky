@@ -580,7 +580,7 @@ td.total-cell{text-align:right;font-weight:600;white-space:nowrap;}
               <input type="password" id="af-password" placeholder="Pri editácii nechajte prázdne ak nemeníte"/>
             </div>
             <div><label>Iniciály * (napr. JB)</label><input id="af-initials" maxlength="5" style="text-transform:uppercase;"/></div>
-            <div><label>Stredisko *</label>
+            <div><label>Stredisko * (vlastné, používa sa na číslovanie jeho objednávok)</label>
               <select id="af-stredisko">
                 <option value="">— vyberte —</option>
                 <option value="ZA5">ZA5</option>
@@ -590,6 +590,11 @@ td.total-cell{text-align:right;font-weight:600;white-space:nowrap;}
                 <option value="BA2">BA2</option>
                 <option value="BA4">BA4</option>
               </select>
+            </div>
+            <div class="full">
+              <label>Zodpovedá aj za ďalšie strediská (voliteľné - napr. vedúci zastrešujúci viac stredísk)</label>
+              <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:6px;" id="af-extra-strediska"></div>
+              <small style="color:var(--muted);display:block;margin-top:3px;">Zaškrtnuté strediská (spolu s vlastným vyššie) uvidí vo "Všetky na stredisku" a bude môcť schvaľovať objednávky z nich.</small>
             </div>
             <div><label>Telefón</label><input id="af-phone" placeholder="+421 9xx xxx xxx"/></div>
             <div>
@@ -799,9 +804,21 @@ function emailsEnabled() {
 function renderSidebar(q) {
   q = (q||'').toLowerCase().trim();
   const list = el('sidebar-list');
-  const base = (S.sidebarFilter === 'mine')
-    ? S.orders.filter(o => o.created_by === S.profile.id)
-    : S.orders;
+  const isFullAccess = S.profile.is_admin || S.profile.approval_level === 2;
+  const myStrediska = (S.profile.stredisko_kod_list && S.profile.stredisko_kod_list.length)
+    ? S.profile.stredisko_kod_list
+    : [S.profile.stredisko];
+  let base;
+  if (S.sidebarFilter === 'mine') {
+    base = S.orders.filter(o => o.created_by === S.profile.id);
+  } else if (!isFullAccess) {
+    // Bežný zamestnanec/vedúci vidí len objednávky za svoje (jedno alebo viac)
+    // stredisko - appka na to musí filtrovať sama, keďže RLS v databáze
+    // obmedzuje viditeľnosť objednávok len podľa firmy (SR/ČR), nie strediska.
+    base = S.orders.filter(o => myStrediska.includes(o.stredisko));
+  } else {
+    base = S.orders;
+  }
   const filtered = base.filter(o =>
     !q || o.order_number.toLowerCase().includes(q)
       || (o.supplier_snapshot?.name||'').toLowerCase().includes(q)
@@ -940,16 +957,18 @@ async function renderDashboard() {
   //   - Vystavovateľ (level 0): len tie, ktoré on sám vystavil
   //   - Vedúci (level 1): všetky za jeho stredisko
   //   - Riaditeľ (level 2): všetky objednávky v systéme
-  const myStredisko = S.profile.stredisko;
+  const myStrediska = (S.profile.stredisko_kod_list && S.profile.stredisko_kod_list.length)
+    ? S.profile.stredisko_kod_list
+    : [S.profile.stredisko];
   let monthApproved, monthApprovedFilter, monthApprovedLabel;
   if (myLevel === 2) {
     monthApproved = S.orders.filter(o => o.status==='schvalena' && (o.updated_at||o.order_date||'').startsWith(thisMonth));
     monthApprovedFilter = {status:'schvalena', month:thisMonth};
     monthApprovedLabel = 'Schválené tento mesiac (celá firma)';
   } else if (myLevel === 1) {
-    monthApproved = S.orders.filter(o => o.status==='schvalena' && (o.updated_at||o.order_date||'').startsWith(thisMonth) && o.stredisko === myStredisko);
-    monthApprovedFilter = {status:'schvalena', month:thisMonth, stredisko:myStredisko};
-    monthApprovedLabel = 'Schválené tento mesiac (stredisko ' + myStredisko + ')';
+    monthApproved = S.orders.filter(o => o.status==='schvalena' && (o.updated_at||o.order_date||'').startsWith(thisMonth) && myStrediska.includes(o.stredisko));
+    monthApprovedFilter = {status:'schvalena', month:thisMonth, stredisko:myStrediska};
+    monthApprovedLabel = 'Schválené tento mesiac (stredisko ' + myStrediska.join(', ') + ')';
   } else {
     monthApproved = myOrders.filter(o => o.status==='schvalena' && (o.updated_at||o.order_date||'').startsWith(thisMonth));
     monthApprovedFilter = {createdBy:myId, status:'schvalena'};
@@ -2885,7 +2904,7 @@ async function loadAdminUserList() {
           <td style="padding:6px 8px;border:1px solid var(--border);">${esc(u.full_name)}${u.is_admin?' <span style="font-size:10px;background:#1f5fa8;color:#fff;padding:1px 5px;border-radius:3px;">admin</span>':''}</td>
           <td style="padding:6px 8px;border:1px solid var(--border);">${esc(u.email||'')}</td>
           <td style="padding:6px 8px;border:1px solid var(--border);font-weight:700;">${esc(u.initials)}</td>
-          <td style="padding:6px 8px;border:1px solid var(--border);">${esc(u.stredisko_kod||u.stredisko||'—')}</td>
+          <td style="padding:6px 8px;border:1px solid var(--border);">${esc(u.stredisko_kod||u.stredisko||'—')}${(u.stredisko_kod_list&&u.stredisko_kod_list.length>1)?` <span style="color:var(--muted);font-size:11px;">(+ ${esc(u.stredisko_kod_list.filter(s=>s!==u.stredisko_kod).join(', '))})</span>`:''}</td>
           <td style="padding:6px 8px;border:1px solid var(--border);">${(u.allowed_company_codes||[]).join(', ')}</td>
           <td style="padding:6px 8px;border:1px solid var(--border);">${LEVEL_LABELS[u.approval_level||0]}</td>
           <td style="padding:6px 8px;border:1px solid var(--border);">
@@ -2916,6 +2935,21 @@ function getSelectedCompanies() {
   return [...el('af-companies').querySelectorAll('input[data-code]:checked')].map(i=>i.dataset.code);
 }
 
+const VSETKY_STREDISKA = ['ZA5','TN3','TO3','SE3','BA2','BA4'];
+function buildStrediskaCheckboxes(selectedExtra) {
+  const wrap = el('af-extra-strediska');
+  wrap.innerHTML = '';
+  VSETKY_STREDISKA.forEach(s => {
+    const checked = (selectedExtra||[]).includes(s);
+    wrap.innerHTML += `<label style="display:flex;align-items:center;gap:4px;font-weight:400;color:var(--text);">
+      <input type="checkbox" data-stred="${s}" ${checked?'checked':''} style="width:auto;"/> ${s}
+    </label>`;
+  });
+}
+function getSelectedExtraStrediska() {
+  return [...el('af-extra-strediska').querySelectorAll('input[data-stred]:checked')].map(i=>i.dataset.stred);
+}
+
 S.editingUserId = null;
 
 el('admin-add-btn').addEventListener('click', () => {
@@ -2933,6 +2967,7 @@ el('admin-add-btn').addEventListener('click', () => {
   el('af-pass-hint').textContent = ' (min. 8 znakov)';
   el('af-password').required = true;
   buildCompanyCheckboxes(null);
+  buildStrediskaCheckboxes(null);
   el('admin-form-wrap').classList.remove('hidden');
   el('admin-form-wrap').scrollIntoView({behavior:'smooth'});
 });
@@ -2975,6 +3010,7 @@ window.openEditUser = function(userId) {
   el('af-pass-hint').textContent = ' (nechajte prázdne ak nemeníte)';
   el('af-password').required = false;
   buildCompanyCheckboxes(u.allowed_company_codes||[]);
+  buildStrediskaCheckboxes((u.stredisko_kod_list||[]).filter(s=>s!==u.stredisko_kod));
   el('admin-form-wrap').classList.remove('hidden');
   el('admin-form-wrap').scrollIntoView({behavior:'smooth'});
 };
@@ -3036,11 +3072,33 @@ el('af-save-btn').addEventListener('click', async () => {
     el('admin-error').classList.remove('hidden'); return;
   }
   el('admin-form-wrap').classList.add('hidden');
+  const wasEditingId = S.editingUserId;
   S.editingUserId = null;
   alert(result.message || 'Hotovo.');
   await loadAdminUserList();
   // Obnov zoznam profilov pre schvaľovanie
   S.profiles = null;
+  // Obnov aj zoznam podpisov - inak by nový/upravený schvaľovateľ (napr. novo
+  // pridaný vedúci) nebol vidieť v zozname "Podpisy" až do zatvorenia a znova
+  // otvorenia celého admin panelu.
+  await renderSignaturesAdmin();
+
+  // Doplnkové strediská (napr. vedúci zastrešujúci viac stredísk) - tento
+  // stĺpec (stredisko_kod_list) Edge Function manage-users zatiaľ nepozná,
+  // preto sa zapisuje samostatne, priamo do tabuľky profiles.
+  const extra = getSelectedExtraStrediska();
+  const fullStrediskaList = [stredKod, ...extra.filter(s => s !== stredKod)];
+  const targetUserId = wasEditingId || (S.adminUsers||[]).find(u => u.email === email)?.id;
+  if (targetUserId) {
+    const {error: strErr} = await supabaseClient.from('profiles')
+      .update({stredisko_kod_list: fullStrediskaList}).eq('id', targetUserId);
+    if (strErr) {
+      console.warn('Nepodarilo sa uložiť doplnkové strediská:', strErr.message);
+      alert('Používateľ bol uložený, ale doplnkové strediská sa nepodarilo uložiť: ' + strErr.message);
+    } else {
+      await loadAdminUserList();
+    }
+  }
 });
 
 // ── REPORTY / ŠTATISTIKY ──────────────────────────────────────────────────
@@ -3099,8 +3157,10 @@ function openReportsWithFilter(filter) {
     if (filter.statusIn) S.reportStatusIn = filter.statusIn;
     if (filter.month) { el('rf-date-from').value = filter.month+'-01'; el('rf-date-to').value = filter.month+'-31'; }
     if (filter.stredisko) {
-      // Vyber správne stredisko v multiselect
-      [...el('rf-stredisko').options].forEach(o => { o.selected = o.value === filter.stredisko; });
+      // Vyber správne stredisko/á v multiselect (filter.stredisko môže byť
+      // jeden reťazec, alebo pole viacerých stredísk naraz)
+      const wanted = Array.isArray(filter.stredisko) ? filter.stredisko : [filter.stredisko];
+      [...el('rf-stredisko').options].forEach(o => { o.selected = wanted.includes(o.value); });
     }
     if (filter.ids) S.reportCustomIds = filter.ids;
     if (filter.pendingApproverId) S.reportPendingApprover = filter.pendingApproverId;
