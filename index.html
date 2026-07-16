@@ -93,9 +93,9 @@ td.total-cell{text-align:right;font-weight:600;white-space:nowrap;}
 
 .order-detail-header{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;}
 .order-detail-header h2{margin-bottom:0;}
-.detail-grid{display:grid;grid-template-columns:auto 1fr;gap:4px 16px;font-size:13px;margin:12px 0;}
-.detail-grid .lbl{color:var(--muted);font-size:12px;white-space:nowrap;}
-.detail-grid .val{font-weight:500;}
+.detail-grid{display:grid;grid-template-columns:auto 1fr;gap:6px 10px;font-size:13px;margin:12px 0;background:#eef2f7;border:1px solid #dde4ec;border-radius:var(--radius);padding:12px 14px;}
+.detail-grid .lbl{color:var(--muted);font-size:12px;white-space:nowrap;padding-top:1px;}
+.detail-grid .val{font-weight:500;color:var(--text);}
 
 #print-area{display:none;}
 </style>
@@ -255,6 +255,7 @@ td.total-cell{text-align:right;font-weight:600;white-space:nowrap;}
             <button class="secondary" id="view-edit-btn">✏️ Editovať</button>
             <button class="secondary hidden" id="view-fix-supplier-btn">🏢 Opraviť dodávateľa</button>
             <button id="view-clone-btn">📋 Použiť ako šablónu</button>
+            <button class="secondary hidden" id="view-delete-btn" style="border-color:#c0392b;color:#c0392b;">🗑 Zmazať objednávku</button>
           </div>
         </div>
         <div class="detail-grid" id="view-grid"></div>
@@ -1094,7 +1095,42 @@ async function openOrder(order) {
   // ktorí majú is_admin automaticky nastavené)
   el('view-fix-supplier-btn').classList.toggle('hidden', !S.profile.is_admin);
   el('fix-supplier-form').classList.add('hidden');
+
+  // Tlačidlo "Zmazať objednávku" - výhradne pre adminov
+  el('view-delete-btn').classList.toggle('hidden', !S.profile.is_admin);
 }
+
+// ── ZMAZANIE OBJEDNÁVKY (výhradne admin) ────────────────────────────────────
+// Poistky proti omylu: (1) tlačidlo vidí len admin, (2) treba presne napísať
+// číslo objednávky do potvrdzovacieho dialógu, (3) SQL funkcia delete_order
+// nezávisle overí is_admin priamo v databáze (aj keby niekto obišiel frontend).
+el('view-delete-btn').addEventListener('click', async () => {
+  const order = S.viewOrder;
+  if (!order) return;
+  const typed = prompt(
+    `Táto akcia je NEVRATNÁ a zmaže objednávku aj s celou históriou schválení a komentárov.\n\n`+
+    `Ak bola táto objednávka poslednou vystavenou vystavovateľom (najvyššie poradové číslo), jej číslo sa po zmazaní uvoľní a nabudúce sa použije znova.\n\n`+
+    `Pre potvrdenie napíšte presné číslo objednávky "${order.order_number}":`
+  );
+  if (typed === null) return;
+  if (typed.trim() !== order.order_number) {
+    alert('Zadané číslo sa nezhoduje s číslom objednávky. Zmazanie zrušené.');
+    return;
+  }
+  el('view-delete-btn').disabled = true;
+  const {error} = await supabaseClient.rpc('delete_order', {p_order_id: order.id});
+  el('view-delete-btn').disabled = false;
+  if (error) {
+    alert('Zmazanie zlyhalo: '+error.message);
+    return;
+  }
+  S.orders = S.orders.filter(o => o.id !== order.id);
+  S.viewOrder = null;
+  renderSidebar(el('sidebar-search').value);
+  renderDashboard();
+  showStep('dashboard-view');
+  alert('Objednávka '+order.order_number+' bola zmazaná.');
+});
 
 // ── OPRAVA DODÁVATEĽA NA OBJEDNÁVKE (admin / riaditeľ) ──────────────────────
 el('view-fix-supplier-btn').addEventListener('click', () => {
@@ -2306,10 +2342,15 @@ el('cancel-edit-btn').addEventListener('click', () => {
 
 async function startEdit(order, items) {
   const isCreator = order.created_by === S.profile.id;
+  const isPendingApprover = order.pending_approver_id === S.profile.id;
+  const myLevel = S.profile.approval_level || 0;
   const canEdit = order.status === 'vystavena'
-    || (order.status === 'schvalena_L1' && isCreator && !order.pending_approver_id);
+    || (order.status === 'schvalena_L1' && isCreator && !order.pending_approver_id)
+    || (order.status === 'caka_L1' && isPendingApprover)
+    || (order.status === 'caka_L2' && isPendingApprover)
+    || (order.status === 'schvalena_L1' && myLevel === 2 && !isCreator);
   if (!canEdit) {
-    alert('Editovať sa dá len objednávka v stave "Vystavená" (alebo vlastná objednávka vedúceho v stave "Schválená L1", kým ešte nebola odoslaná riaditeľovi). Objednávka v schvaľovacom procese sa nedá meniť.');
+    alert('Editovať sa dá len objednávka v stave "Vystavená", vlastná objednávka vedúceho v stave "Schválená L1" kým ešte nebola odoslaná riaditeľovi, alebo objednávka, ktorá práve čaká na Vaše schválenie.');
     return;
   }
   S.editingOrder = order;
@@ -2452,10 +2493,17 @@ async function loadApprovalPanel(order) {
     histDiv.innerHTML = '';
   }
 
-  // Editovať sa dá objednávka v stave 'vystavena', alebo 'schvalena_L1'
-  // ak ju vystavil sám vedúci a ešte ju neposlal riaditeľovi (čiže kým
-  // je pending_approver_id prázdne).
-  const canEdit = status === 'vystavena' || (status === 'schvalena_L1' && isCreator && !order.pending_approver_id);
+  // Editovať sa dá:
+  // - objednávka v stave 'vystavena' (vystavovateľ)
+  // - vlastná 'schvalena_L1' objednávka vedúceho, kým ju neposlal riaditeľovi
+  // - objednávka, ktorá PRÁVE ČAKÁ na rozhodnutie prihláseného schvaľovateľa
+  //   (1. aj 2. úroveň) - vedúci/riaditeľ tak môžu pred schválením opraviť
+  //   čokoľvek (položky, texty, dátumy), nielen dodávateľa.
+  const canEdit = status === 'vystavena'
+    || (status === 'schvalena_L1' && isCreator && !order.pending_approver_id)
+    || (status === 'caka_L1' && isPendingApprover)
+    || (status === 'caka_L2' && isPendingApprover)
+    || (status === 'schvalena_L1' && myLevel === 2 && !isCreator);
   el('view-edit-btn').classList.toggle('hidden', !canEdit);
 
   // Panel logic
