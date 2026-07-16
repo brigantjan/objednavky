@@ -47,7 +47,26 @@ header.topbar .user-info{font-size:13px;display:flex;align-items:center;gap:10px
 
 .main-content{flex:1;overflow-y:auto;padding:16px;}
 .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:14px;}
+/* Editačné bloky - celý blok podfarbený, editovateľné polia (input/select/textarea)
+   zostávajú biele, aby bolo na prvý pohľad jasné, čo sa dá vyplniť. Platí jednotne
+   pre celú appku (formulár objednávky, prihlásenie, admin formuláre, schvaľovanie...). */
+#step-form,#admin-form-wrap,#admin-supplier-form-wrap,#fix-supplier-form,
+#login-form,#approval-panel,.settings-block{
+  background:#eef2f7 !important;
+}
+#step-form input,#step-form select,#step-form textarea,
+#admin-form-wrap input,#admin-form-wrap select,#admin-form-wrap textarea,
+#admin-supplier-form-wrap input,#admin-supplier-form-wrap select,#admin-supplier-form-wrap textarea,
+#fix-supplier-form input,#fix-supplier-form select,#fix-supplier-form textarea,
+#login-form input,#login-form select,#login-form textarea,
+#approval-panel input,#approval-panel select,#approval-panel textarea,
+.settings-block input,.settings-block select,.settings-block textarea{
+  background:#fff;
+}
+#new-supplier-fields{background:#e4eaf2;} /* vnorený blok vo formulári objednávky - o odtieň tmavšie, nech je vidno, že je to podblok */
 .card h2{font-size:16px;margin-bottom:12px;}
+#approval-panel{padding-left:14px;padding-right:14px;padding-bottom:14px;border-radius:8px;}
+#login-form{padding:14px;border-radius:8px;margin-top:2px;}
 .hidden{display:none!important;}
 
 #login-view{max-width:360px;margin:80px auto;}
@@ -539,7 +558,7 @@ td.total-cell{text-align:right;font-weight:600;white-space:nowrap;}
         <div id="admin-error" class="banner error hidden"></div>
 
         <!-- Systémové nastavenia -->
-        <div style="border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;background:#fafbfc;margin-bottom:20px;">
+        <div class="settings-block" style="border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:20px;">
           <h3 style="margin:0 0 8px;font-size:14px;">Systémové nastavenia</h3>
           <label style="display:flex;align-items:center;gap:8px;font-weight:400;">
             <input type="checkbox" id="setting-emails-enabled" style="width:auto;"/>
