@@ -14,6 +14,10 @@
   --card:#fff;--border:#d7dde5;--text:#1c2733;--muted:#6b7785;
   --error:#c0392b;--error-bg:#fdecea;--success:#1e7e34;--radius:8px;
   --sidebar:280px;
+  /* Pozadie prihlasovacej obrazovky - rovnaky "tapeta" vzor ako v Poruchach
+     (modra) a Dispecingu balickov (zelena), tu vo fialovej. */
+  --login-bg-a:#f3edfb; --login-bg-b:#d9c7f2;
+  --login-wave-1:rgba(106,27,154,.30); --login-wave-2:rgba(255,255,255,.55);
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:"Segoe UI",Arial,sans-serif;background:var(--bg);color:var(--text);display:flex;flex-direction:column;height:100vh;overflow:hidden;}
@@ -69,8 +73,14 @@ header.topbar .user-info{font-size:13px;display:flex;align-items:center;gap:10px
 #login-form{padding:14px;border-radius:8px;margin-top:2px;}
 .hidden{display:none!important;}
 
-#login-view{max-width:360px;margin:80px auto;}
-#login-view .card{text-align:center;}
+#login-view{
+  min-height:100vh;display:flex;align-items:center;justify-content:center;
+  background:
+    radial-gradient(1100px 750px at 12% 10%, var(--login-wave-2), transparent 55%),
+    linear-gradient(128deg, var(--login-wave-1) 0%, transparent 52%),
+    linear-gradient(155deg, var(--login-bg-a) 0%, var(--login-bg-b) 100%);
+}
+#login-view .card{text-align:center;max-width:360px;width:100%;}
 
 label{display:block;font-size:12px;font-weight:600;margin-bottom:3px;color:var(--muted);margin-top:10px;}
 input,select,textarea{width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;font-family:inherit;background:#fff;color:var(--text);}
