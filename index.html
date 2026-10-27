@@ -432,6 +432,7 @@ td.total-cell{text-align:right;font-weight:600;white-space:nowrap;}
               <label>Dátum vystavenia *</label>
               <input type="date" id="order-date"/>
               <div class="field-error" id="err-order-date"></div>
+              <small id="order-date-hint" class="hidden" style="color:var(--muted);display:block;margin-top:3px;"></small>
             </div>
 
             <div>
@@ -509,9 +510,10 @@ td.total-cell{text-align:right;font-weight:600;white-space:nowrap;}
 
           <div class="form-grid" style="margin-top:14px;">
             <div>
-              <label>Dátum dodania</label>
+              <label>Dátum dodania<span id="delivery-date-req" class="hidden"> *</span></label>
               <input type="date" id="delivery-date"/>
               <div class="field-error" id="err-delivery-date"></div>
+              <small id="delivery-date-hint" class="hidden" style="color:#1f5fa8;display:block;margin-top:3px;">Z dátumu dodania sa automaticky navrhne dátum vystavenia (pracovný deň 15–20 dní pred dodaním, bez víkendov a sviatkov).</small>
             </div>
             <div>
               <label>Spôsob platby *</label>
@@ -575,6 +577,11 @@ td.total-cell{text-align:right;font-weight:600;white-space:nowrap;}
             Automatické emailové notifikácie (schválenie, vrátenie, zamietnutie...)
           </label>
           <small id="setting-emails-hint" style="color:var(--muted);display:block;margin-top:4px;"></small>
+          <label style="display:flex;align-items:center;gap:8px;font-weight:400;margin-top:12px;">
+            <input type="checkbox" id="setting-rezim-za5" style="width:auto;"/>
+            Režim „len ZA5“ (pilot) – bez schvaľovania, objednávka sa tlačí a podpisuje ručne
+          </label>
+          <small id="setting-rezim-za5-hint" style="color:var(--muted);display:block;margin-top:4px;"></small>
         </div>
 
         <!-- Zoznam používateľov -->
@@ -589,7 +596,11 @@ td.total-cell{text-align:right;font-weight:600;white-space:nowrap;}
             <div><label>Heslo *<span id="af-pass-hint" style="font-weight:400;color:var(--muted);"> (min. 8 znakov)</span></label>
               <input type="password" id="af-password" placeholder="Pri editácii nechajte prázdne ak nemeníte"/>
             </div>
-            <div><label>Iniciály * (napr. JB)</label><input id="af-initials" maxlength="5" style="text-transform:uppercase;"/></div>
+            <div><label>Iniciály * (napr. JV – len písmená A–Z, bez diakritiky)</label><input id="af-initials" maxlength="4" style="text-transform:uppercase;"/></div>
+            <div><label>Posledné použité číslo objednávky v roku <span id="af-counter-year"></span></label>
+              <input type="number" id="af-last-number" min="0" step="1" placeholder="0 = začína od 1"/>
+              <small id="af-number-preview" style="color:#1f5fa8;display:block;margin-top:3px;"></small>
+            </div>
             <div><label>Stredisko * (vlastné, používa sa na číslovanie jeho objednávok)</label>
               <select id="af-stredisko">
                 <option value="">— vyberte —</option>
@@ -721,7 +732,9 @@ const S = {
 const el = id => document.getElementById(id);
 const esc = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const fmt = v => (Number(v)||0).toLocaleString('sk-SK',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
-const today = () => new Date().toISOString().slice(0,10);
+// Lokálny (nie UTC) dátum - inak by medzi 00:00 a 01:00/02:00 vracalo včerajšok
+const isoLocal = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const today = () => isoLocal(new Date());
 const fmtD = d => d ? d.slice(0,10).split('-').reverse().join('.') : '';
 const fmtDateTime = ts => {
   if (!ts) return '';
@@ -732,6 +745,51 @@ const fmtDateTime = ts => {
   return datePart + ' ' + timePart;
 };
 const setErr = (id,m) => { const e=el(id); if(e) e.textContent=m||''; };
+
+// ── REŽIM „LEN ZA5“ ─────────────────────────────────────────────────────
+// Prepína sa v Správe používateľov (app_settings.rezim_len_za5). V tomto režime
+// sa objednávky v systéme neschvaľujú - po vystavení sa vytlačia a podpíšu ručne.
+const isZA5Mode = () => S.settings?.rezim_len_za5 === 'true';
+
+// ── PRACOVNÉ DNI A NÁVRH DÁTUMU VYSTAVENIA ───────────────────────────────
+// Sviatky sa načítavajú z tabuľky objednavky.sviatky (rovnaký zdroj ako SQL
+// funkcia navrh_datum_vystavenia), aby frontend aj databáza počítali rovnako.
+const addDaysIso = (iso, n) => { const [y,m,d]=iso.split('-').map(Number); return isoLocal(new Date(y, m-1, d+n)); };
+const isWorkdayIso = iso => {
+  const [y,m,d]=iso.split('-').map(Number);
+  const dow = new Date(y, m-1, d).getDay(); // 0 = nedeľa, 6 = sobota
+  return dow!==0 && dow!==6 && !(S.sviatky && S.sviatky.has(iso));
+};
+// Posledný pracovný deň, ktorý je 15–20 dní pred dodaním (hľadá sa od D-15 dozadu).
+// Nikdy nie v budúcnosti - pri vzdialenom dodaní sa navrhne posledný pracovný deň k dnešku.
+function suggestOrderDate(deliveryIso) {
+  if (!deliveryIso) return today();
+  let d = addDaysIso(deliveryIso, -15);
+  if (d > today()) d = today();
+  for (let i=0; i<40 && !isWorkdayIso(d); i++) d = addDaysIso(d, -1);
+  return d;
+}
+const daysBetween = (fromIso, toIso) => {
+  const [y1,m1,d1]=fromIso.split('-').map(Number), [y2,m2,d2]=toIso.split('-').map(Number);
+  return Math.round((Date.UTC(y2,m2-1,d2) - Date.UTC(y1,m1-1,d1)) / 86400000);
+};
+
+// Profil vystavovateľa objednávky (do tlače "Vybavuje" patrí vystavovateľ, nie ten, kto práve tlačí)
+async function getProfileById(id) {
+  if (!id) return S.profile;
+  if (id === S.profile.id) return S.profile;
+  if (!S.profiles) {
+    const {data} = await supabaseClient.from('profiles').select('*');
+    S.profiles = data||[];
+  }
+  let p = S.profiles.find(x=>x.id===id);
+  if (!p && id !== '__load__') {
+    // cache mohla byť načítaná len s aktívnymi profilmi - dotiahni konkrétny profil
+    const {data} = await supabaseClient.from('profiles').select('*').eq('id', id).maybeSingle();
+    if (data) { p = data; S.profiles.push(data); }
+  }
+  return p || null;
+}
 
 // ── LOGIN ──────────────────────────────────────────────────────────────
 el('login-form').addEventListener('submit', async e => {
@@ -782,14 +840,17 @@ async function loadAll() {
   // Dodávateľov (môže ich byť tisíce) už NEnaťahujeme naraz pri každom prihlásení -
   // vyhľadávajú sa priebežne podľa písania (viď searchSuppliers()). S.suppliers tu
   // preto zostáva prázdne, dopĺňa sa až ad-hoc pri vyhľadávaní/výbere/editácii.
-  const [cR,tR,zR,oR,aR,stR] = await Promise.all([
+  const [cR,tR,zR,oR,aR,stR,svR] = await Promise.all([
     supabaseClient.from('companies').select('*'),
     supabaseClient.from('order_templates').select('*').order('sort_order'),
     supabaseClient.from('zakazky').select('*').eq('aktivna',true).order('cislo'),
-    supabaseClient.from('orders').select('*').order('sequence_number',{ascending:false}),
+    supabaseClient.from('orders').select('*').order('created_at',{ascending:false}),
     supabaseClient.from('attachment_options').select('*').eq('aktivna',true).order('text'),
-    supabaseClient.from('app_settings').select('*')
+    supabaseClient.from('app_settings').select('*'),
+    supabaseClient.from('sviatky').select('datum')
   ]);
+  if (svR.error) console.warn('Sviatky sa nepodarilo načítať (návrh dátumu vynechá len víkendy):', svR.error.message);
+  S.sviatky = new Set((svR.data||[]).map(r=>r.datum));
   S.companies = (cR.data||[]).filter(c=>(S.profile.allowed_company_codes||[]).includes(c.code));
   S.templates = tR.data||[];
   S.suppliers = [];
@@ -901,10 +962,13 @@ async function renderDashboard() {
   // tak nestiahne tá istá tabuľka opakovane zbytočne.
   const now = Date.now();
   if (!S._ordersLoadedAt || now - S._ordersLoadedAt > 20000) {
-    const {data: freshOrders} = await supabaseClient.from('orders').select('*').order('sequence_number',{ascending:false});
+    const {data: freshOrders} = await supabaseClient.from('orders').select('*').order('created_at',{ascending:false});
     S.orders = freshOrders || [];
     S._ordersLoadedAt = now;
   }
+
+  if (isZA5Mode()) { renderDashboardZA5(); return; }
+  el('dash-attention-title').textContent = 'Vyžaduje vašu pozornosť';
 
   // Moje schválenia (na zistenie, ktoré objednávky som JA postúpil ďalej)
   const {data: myApprovals} = await supabaseClient.from('approvals')
@@ -1069,6 +1133,60 @@ async function renderDashboard() {
       </div>`;
     }).join('');
   }
+}
+
+// Dashboard v režime „len ZA5“ - bez schvaľovacích dlaždíc, prehľad vystavených objednávok
+function renderDashboardZA5() {
+  const myId = S.profile.id;
+  const isLeader = S.profile.is_admin || (S.profile.approval_level||0) >= 1;
+  const thisMonth = today().slice(0,7), thisYear = today().slice(0,4);
+  const za5 = S.orders.filter(o => o.stredisko === 'ZA5');
+  const mine = za5.filter(o => o.created_by === myId);
+  const ids = arr => arr.map(o=>o.id);
+  const inMonth = o => (o.order_date||'').startsWith(thisMonth);
+  const inYear  = o => (o.order_date||'').startsWith(thisYear);
+
+  el('dash-stredisko-overview').classList.add('hidden');
+  const stats = [
+    {label:'Moje objednávky tento mesiac', list:mine.filter(inMonth), tone:'neutral'},
+    {label:'Moje objednávky v roku '+thisYear, list:mine.filter(inYear), tone:'neutral'},
+    {label:'Stredisko ZA5 tento mesiac', list:za5.filter(inMonth), tone:'success'},
+    {label:'Stredisko ZA5 v roku '+thisYear, list:za5.filter(inYear), tone:'success'},
+  ];
+  const TONE = {neutral:{bg:'#f0f3f7',fg:'#475467'}, success:{bg:'#e9f7ee',fg:'#1e7e34'}};
+  el('dash-stats').innerHTML = stats.map((s,i)=>`<div style="background:${TONE[s.tone].bg};border-radius:10px;padding:14px;cursor:pointer;"
+       onclick="window.__openStatFilter(${i})">
+      <div style="font-size:22px;font-weight:600;color:${TONE[s.tone].fg};line-height:1;">${s.list.length}</div>
+      <div style="font-size:12px;color:${TONE[s.tone].fg};margin-top:6px;opacity:0.85;">${s.label}</div>
+    </div>`).join('');
+  S.dashStatFilters = stats.map(s=>({ids:ids(s.list)}));
+
+  // Posledné objednávky: vedúci/admin vidí celé stredisko, ostatní svoje
+  const recent = (isLeader ? za5 : mine).slice(0, 12);
+  el('dash-attention-title').textContent = isLeader ? 'Posledné objednávky strediska ZA5' : 'Moje posledné objednávky';
+  const listEl = el('dash-attention-list');
+  if (!recent.length) {
+    listEl.innerHTML = '';
+    el('dash-empty-msg').classList.remove('hidden');
+    return;
+  }
+  el('dash-empty-msg').classList.add('hidden');
+  const profName = id => (S.profiles||[]).find(p=>p.id===id)?.full_name || '';
+  listEl.innerHTML = recent.map(o => {
+    const sup = o.supplier_snapshot?.name || '—';
+    const who = (isLeader && o.created_by !== myId) ? ' · vystavil(a) '+profName(o.created_by) : '';
+    return `<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 4px;border-bottom:1px solid var(--border);cursor:pointer;" onclick="window.__openOrderById('${o.id}')">
+      <i class="ti ti-printer" style="font-size:18px;color:#475467;margin-top:1px;flex-shrink:0;"></i>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:14px;"><span style="font-weight:600;">${esc(o.order_number)}</span>
+          <span style="color:var(--muted);"> · vystavená ${fmtD(o.order_date)}${o.delivery_date?' · dodanie '+fmtD(o.delivery_date):''}</span></div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px;">${esc(sup)}${o.total_amount?' · '+fmt(o.total_amount):''}${esc(who)}</div>
+      </div>
+      <i class="ti ti-chevron-right" style="font-size:16px;color:var(--muted);flex-shrink:0;margin-top:3px;"></i>
+    </div>`;
+  }).join('');
+  // Mená vystavovateľov sa doplnia po načítaní profilov
+  if (isLeader && !S.profiles) getProfileById('__load__').then(()=>{ if (isZA5Mode() && !el('dashboard-view').classList.contains('hidden')) renderDashboardZA5(); });
 }
 
 window.__openStatFilter = function(i) {
@@ -1309,6 +1427,8 @@ async function cloneOrder(order, items) {
   el('billing-note').value = order.billing_note||'';
   el('attachment-note').value = order.attachment_note||'';
   el('delivery-date').value = '';
+  setErr('err-delivery-date','');
+  applyZA5FormMode();
   el('doprava').value = order.doprava||'';
   el('sprava').value = order.sprava||'';
   el('note').value = order.note||'';
@@ -1385,6 +1505,7 @@ function buildForm(tpl) {
   el('order-date').value=today();
   syncDeliveryDateMin();
   el('delivery-date').value='';
+  applyZA5FormMode();
   el('order-currency').value='EUR';
   el('invoice-due-days').value=S.selCompany?.invoice_due_days||45;
   buildItemsHead(tpl);
@@ -1608,17 +1729,70 @@ el('new-supplier-toggle').addEventListener('change',e=>{
 // nastavujeme min atribút na poli, aby sa to nedalo vybrať ani v kalendári.
 function syncDeliveryDateMin() {
   const od = el('order-date').value;
+  el('order-date').max = today(); // dátum vystavenia nesmie byť v budúcnosti (overuje aj databáza)
   if (od) {
-    el('delivery-date').min = od;
+    // V režime ZA5 sa dátum vystavenia odvádza od dodania, preto dodanie neobmedzujeme
+    // kalendárom (dá sa zadať aj spätne); kontrola "dodanie >= vystavenie" ostáva.
+    el('delivery-date').min = isZA5Mode() ? '' : od;
     // ak je už vyplnený nesprávny dátum dodania, vyčisti ho a upozorni
     if (el('delivery-date').value && el('delivery-date').value < od) {
       el('delivery-date').value = '';
       setErr('err-delivery-date', 'Dátum dodania bol vynulovaný, lebo bol skorší ako nový dátum vystavenia.');
     }
   }
+  if (isZA5Mode()) updateOrderDateHint();
 }
 el('order-date').addEventListener('change', syncDeliveryDateMin);
 el('order-date').addEventListener('input', syncDeliveryDateMin);
+
+// ── Režim ZA5: automatický návrh dátumu vystavenia z dátumu dodania ──────
+// V režime ZA5 presunieme pole "Dátum dodania" hneď vedľa "Dátum vystavenia" (hore),
+// lebo dátum vystavenia sa z neho počíta; pri vypnutom režime sa vráti na pôvodné miesto.
+const _ddBox = el('delivery-date').closest('div');
+const _ddHome = {parent:_ddBox.parentNode, next:_ddBox.nextElementSibling};
+function applyZA5FormMode() {
+  const on = isZA5Mode();
+  const odBox = el('order-date').closest('div');
+  if (on && odBox.nextElementSibling !== _ddBox) odBox.after(_ddBox);
+  if (!on && _ddBox.parentNode !== _ddHome.parent) _ddHome.parent.insertBefore(_ddBox, _ddHome.next);
+  el('delivery-date-req').classList.toggle('hidden', !on);
+  el('delivery-date-hint').classList.toggle('hidden', !on);
+  el('order-date-hint').classList.toggle('hidden', !on);
+  el('order-date').max = today();
+  if (on) updateOrderDateHint();
+}
+
+const dniTxt = n => n + (Math.abs(n)===1 ? ' deň' : (Math.abs(n)>=2 && Math.abs(n)<=4 ? ' dni' : ' dní'));
+function updateOrderDateHint() {
+  const hint = el('order-date-hint');
+  const od = el('order-date').value, dd = el('delivery-date').value;
+  if (!dd) {
+    hint.style.color = 'var(--muted)';
+    hint.textContent = 'Navrhne sa automaticky po zadaní dátumu dodania.';
+    return;
+  }
+  if (!od) { hint.textContent = ''; return; }
+  const diff = daysBetween(od, dd);
+  const warn = [];
+  if (!isWorkdayIso(od)) warn.push('nie je pracovný deň');
+  if (diff < 15) warn.push('je len '+dniTxt(diff)+' pred dodaním (pravidlo: 15–20 dní)');
+  if (warn.length) {
+    hint.style.color = '#c0392b';
+    hint.textContent = '⚠ Dátum vystavenia ' + warn.join(' a ') + '.';
+  } else {
+    hint.style.color = '#1e7e34';
+    hint.textContent = '✓ ' + dniTxt(diff) + ' pred dodaním, pracovný deň.' + (diff > 20 ? ' (Dodanie je ďaleko - dátum vystavenia nemôže byť v budúcnosti.)' : '');
+  }
+}
+
+el('delivery-date').addEventListener('change', () => {
+  if (!isZA5Mode()) return;
+  const dd = el('delivery-date').value;
+  if (!dd || Number(dd.slice(0,4)) < 2000) { updateOrderDateHint(); return; }
+  setErr('err-delivery-date','');
+  el('order-date').value = suggestOrderDate(dd);
+  syncDeliveryDateMin();
+});
 
 // ── SUBMIT ───────────────────────────────────────────────────────────────
 el('order-form').addEventListener('submit', async e => {
@@ -1669,7 +1843,10 @@ el('order-form').addEventListener('submit', async e => {
 
   const ddVal=el('delivery-date').value;
   if(ddVal&&ddVal<orderDate){setErr('err-delivery-date','Dátum dodania nesmie byť pred dátumom vystavenia.');ok=false;}
+  else if(isZA5Mode()&&!ddVal){setErr('err-delivery-date','Vyplňte dátum dodania (z neho sa určuje dátum vystavenia).');ok=false;}
   else setErr('err-delivery-date','');
+  if(orderDate&&orderDate>today()){setErr('err-order-date','Dátum vystavenia nesmie byť v budúcnosti.');ok=false;}
+  if(!ok){el('form-error').textContent='Formulár obsahuje chyby - skontrolujte červeno označené polia.';el('form-error').classList.remove('hidden');}
 
   if(!ok) return;
   el('submit-btn').disabled=true;
@@ -1778,7 +1955,8 @@ el('order-form').addEventListener('submit', async e => {
     S.orders.unshift(order); S.cloneData=null;
     renderSidebar(el('sidebar-search').value);
     showStep('step-result');
-    el('result-banner').textContent='Objednávka č. '+order.order_number+' bola úspešne vystavená.';
+    el('result-banner').textContent='Objednávka č. '+order.order_number+' bola úspešne vystavená.'
+      + (isZA5Mode() ? ' Vytlačte ju (🖨 Tlač / PDF) a dajte podpísať.' : '');
   } finally { el('submit-btn').disabled=false; }
 });
 
@@ -1815,6 +1993,13 @@ async function buildXlsx(order, items) {
   const comp=S.companies.find(c=>c.code===order.company_code)||{};
   const sup=order.supplier_snapshot||{};
   const tpl=S.templates.find(t=>t.code===order.template_code)||{};
+  const creator=(await getProfileById(order.created_by)) || {};
+  const za5=isZA5Mode();
+  const currency=order.currency||'EUR';
+  const dueDays=order.invoice_due_days ?? comp.invoice_due_days ?? 45;
+  const bankAccount = currency==='CZK' ? (comp.bank_account_czk||comp.bank_account||'') : (comp.bank_account||'');
+  const bankName    = currency==='CZK' ? (comp.bank_name_czk||comp.bank_name||'')       : (comp.bank_name||'');
+  const vatRate=VAT_RATE[order.company_code];
 
   // Načítaj podpisy schválenia + pečiatku (rovnaká logika ako v tlačovom PDF)
   const {data:approvalHist} = await supabaseClient.from('approvals')
@@ -1877,7 +2062,7 @@ async function buildXlsx(order, items) {
   // Header
   M(2,5,2,12); SC(2,5,comp.name,{bold:true,sz:14});
   M(3,5,3,12); SC(3,5,comp.address+', '+comp.zip+' '+comp.city,{sz:9});
-  M(4,5,4,12); SC(4,5,'tel. +421 244 451 339   mail: '+comp.email,{sz:9});
+  M(4,5,4,12); SC(4,5,'tel. +421 244 451 339   mail: '+(HEADER_MAIL[order.company_code]||comp.email),{sz:9});
   M(5,5,5,12); SC(5,5,'IČO: '+comp.ico,{sz:9});
   M(2,14,2,17); SC(2,14,'Objednávka č. '+order.order_number,{bold:true,h:'right'});
 
@@ -1891,7 +2076,7 @@ async function buildXlsx(order, items) {
 
   const ALBL=['Meno','Adresa','PSČ','Vybavuje','Telefón','IČO','DIČ'];
   const SV=[sup.name,sup.address,(sup.zip||'')+' '+(sup.city||''),sup.contact_person||'',sup.phone||'',sup.ico||'',sup.dic||''];
-  const CV=[comp.name,comp.address,comp.zip+' '+comp.city,S.profile.full_name,S.profile.phone||'',comp.ico,comp.dic];
+  const CV=[comp.name,comp.address,comp.zip+' '+comp.city,creator.full_name||'',creator.phone||'',comp.ico,comp.dic];
   for(let i=0;i<7;i++){
     const r=11+i; ws.getRow(r).height=14;
     SC(r,4,ALBL[i]); M(r,5,r,11); SC(r,5,SV[i],{b:true});
@@ -1921,6 +2106,7 @@ async function buildXlsx(order, items) {
   // Intro text riadky - rámik len ak majú obsah
   r=21;
   const ilines=(order.intro_text||'').split('\n').filter(l=>l.trim());
+  if (ilines.length) ilines[0] = 'Objednávame si u Vás: ' + ilines[0];
   ilines.forEach((line,li)=>{
     if(li>0){r++;ws.getRow(r).height=14;}
     ws.getRow(r).height=14;
@@ -1964,10 +2150,12 @@ async function buildXlsx(order, items) {
 
   // Adresa faktúry
   [
+    ...(order.doprava?[[true,'Spôsob dopravy: '+order.doprava]]:[]),
+    ...(vatRate?[[false,'Ceny sú uvedené bez DPH.'],[false,'DPH '+vatRate+' % bude fakturovaná podľa platných predpisov.']]:[]),
     [true,'Faktúru pošlite na adresu:'],
     [true,comp.name+', '+comp.address+', '+comp.zip+' '+comp.city],
     [false,comp.email],
-    [false,'Splatnosť faktúry: '+(comp.invoice_due_days||45)+' dní od dodania']
+    [false,'Splatnosť faktúry: '+dueDays+' dní od dodania']
   ].forEach(([bold,txt])=>{
     r++; ws.getRow(r).height=14;
     if(tpl.show_quantity_columns){
@@ -2010,16 +2198,16 @@ async function buildXlsx(order, items) {
   const dr=r-3;
   M(dr,14,dr,17); SC(dr,14,'Dátum dodania',{bold:true,h:'center',f:'FFD9D9D9'});
   M(dr+1,14,dr+3,17);
-  const dc=ws.getCell(dr+1,14); dc.value=order.delivery_date||'';
+  const dc=ws.getCell(dr+1,14); dc.value=order.delivery_date?fmtD(order.delivery_date):'';
   dc.font={name:'Calibri',size:12,bold:true};
   dc.alignment={horizontal:'center',vertical:'center'}; dc.border=B();
 
   r++; ws.getRow(r).height=20;
   M(r,5,r,8); SC(r,5,'Číslo účtu / kreditnej karty');
-  M(r,10,r,12); SC(r,10,comp.bank_account||'',{b:true});
+  M(r,10,r,12); SC(r,10,bankAccount+(bankAccount?' ('+currency+')':''),{b:true});
   r++; ws.getRow(r).height=14;
   M(r,5,r,8); SC(r,5,'Kód banky / Platí do');
-  M(r,10,r,12); SC(r,10,comp.bank_name||'',{b:true});
+  M(r,10,r,12); SC(r,10,bankName,{b:true});
 
   // Oddeľovač
   r+=2; ws.getRow(r).height=6;
@@ -2031,8 +2219,8 @@ async function buildXlsx(order, items) {
   const ar=r;
   // Hlavičky úrovní
   r++; ws.getRow(r).height=14;
-  M(r,2,r,8); SC(r,2,'1. úroveň (vedúci strediska)',{bold:true,sz:9});
-  M(r,9,r,17); SC(r,9,'2. úroveň (riaditeľ)',{bold:true,sz:9});
+  M(r,2,r,8); SC(r,2,za5?'Vystavil':'1. úroveň (vedúci strediska)',{bold:true,sz:9});
+  M(r,9,r,17); SC(r,9,za5?'Schválil – vedúci strediska':'2. úroveň (riaditeľ)',{bold:true,sz:9});
   const sigRowStart = r+1;
   // Riadky na podpis (4 riadky vysoké pre obrázok)
   for(let i=0;i<4;i++){
@@ -2044,9 +2232,9 @@ async function buildXlsx(order, items) {
   }
   // Mená a dátumy pod podpismi
   r++; ws.getRow(r).height=13;
-  M(r,2,r,8); SC(r,2, sigL1Name ? (sigL1Name+' · '+sigL1Date) : 'nepodpísané', {sz:9, italic:!sigL1Name});
+  M(r,2,r,8); SC(r,2, za5 ? ((creator.full_name||'')+' – podpis, dátum') : (sigL1Name ? (sigL1Name+' · '+sigL1Date) : 'nepodpísané'), {sz:9, italic:za5||!sigL1Name});
   ws.getCell(r,2).border = SB(false,true);
-  M(r,9,r,17); SC(r,9, sigL2Name ? (sigL2Name+' · '+sigL2Date) : 'nepodpísané', {sz:9, italic:!sigL2Name});
+  M(r,9,r,17); SC(r,9, za5 ? 'Meno, podpis, dátum' : (sigL2Name ? (sigL2Name+' · '+sigL2Date) : 'nepodpísané'), {sz:9, italic:za5||!sigL2Name});
   ws.getCell(r,9).border = SB(false,true);
 
   // Vlož obrázky podpisov, ak existujú
@@ -2100,8 +2288,15 @@ async function exportExcel(order, items) {
 }
 
 // printOrder - rovnaký xlsx, otvorí sa v novom okne a vytlačí
+// Údaje do tlače podľa firemnej šablóny objednávky
+const HEADER_MAIL = {SR:'suptel@suptel.sk'};   // mail v hlavičke (fakturačný mail ostáva companies.email)
+const VAT_RATE    = {SR:23, CZ:21};            // sadzba DPH do textu "Ceny sú uvedené bez DPH"
+
 async function printOrder(order, items) {
   const comp=S.companies.find(c=>c.code===order.company_code)||{};
+  const creator=(await getProfileById(order.created_by)) || {};
+  const za5=isZA5Mode();
+  const vatRate=VAT_RATE[order.company_code];
   const sup=order.supplier_snapshot||{};
   const currency=order.currency||'EUR';
   const dueDays=order.invoice_due_days ?? comp.invoice_due_days ?? 45;
@@ -2157,9 +2352,7 @@ async function printOrder(order, items) {
     </div>`;
   }).join('');
 
-  const zakazkaHtml = zakazka
-    ? `<b>${esc(zakazka.nazov||'')}</b> (č.z. ${esc(order.zakazka_cislo)})`
-    : `Zákazka č.: ${esc(order.zakazka_cislo)}`;
+  const zakazkaHtml = `<b>Zákazka ${esc(order.zakazka_cislo)}${zakazka?.nazov ? ' – '+esc(zakazka.nazov) : ''}</b>`;
   const introText = order.intro_text ? `<b>Objednávame si u Vás:</b> ${esc(order.intro_text).replace(/\n/g,'<br/>')}` : '';
 
   const html=`<!DOCTYPE html><html lang="sk"><head><meta charset="UTF-8"/>
@@ -2191,7 +2384,10 @@ body{font-family:Calibri,Arial,sans-serif;font-size:11px;padding:12mm 15mm;displ
 .field-row.psc .field-value.zip{flex:0 0 70px;margin-right:10px;}
 .field-row.psc .field-value.city{flex:1;}
 
-.zakazka-line{font-size:11px;margin:0 0 4px;}
+.center-line{text-align:center;font-size:10.5px;padding:5px 6px 0;}
+.center-line b{font-weight:bold;}
+.sign-line{border-bottom:1px solid #000;height:46px;margin-top:4px;}
+.sign-cap{font-size:8.5px;color:#555;margin-top:1px;}
 
 .items-wrap{flex:1;display:flex;flex-direction:column;margin-bottom:4px;}
 .items-frame{border:1px solid #000;flex:1;display:flex;flex-direction:column;}
@@ -2258,7 +2454,7 @@ body{font-family:Calibri,Arial,sans-serif;font-size:11px;padding:12mm 15mm;displ
       <div class="co-name">${esc(comp.name)}</div>
       <div class="co-addr">
         ${esc(comp.address)}, ${esc(comp.zip)} ${esc(comp.city)}<br/>
-        tel. +421 244 451 339 &nbsp; mail: ${esc(comp.email)}<br/>
+        tel. +421 244 451 339 &nbsp; mail: ${esc(HEADER_MAIL[order.company_code]||comp.email)}<br/>
         IČO: ${esc(comp.ico)}
       </div>
     </div>
@@ -2286,15 +2482,14 @@ body{font-family:Calibri,Arial,sans-serif;font-size:11px;padding:12mm 15mm;displ
     <div class="field-row"><div class="field-label">Meno</div><div class="field-value">${esc(comp.name)}</div></div>
     <div class="field-row"><div class="field-label">Adresa</div><div class="field-value">${esc(comp.address)}</div></div>
     <div class="field-row psc"><div class="field-label">PSČ</div><div class="field-value zip">${esc(comp.zip)}</div><div class="field-value city">${esc(comp.city)}</div></div>
-    <div class="field-row"><div class="field-label">Vybavuje</div><div class="field-value">${esc(S.profile.full_name)}</div></div>
-    <div class="field-row"><div class="field-label">Telefon</div><div class="field-value">${esc(S.profile.phone||'')}</div></div>
-    <div class="field-row"><div class="field-label">Email</div><div class="field-value">${esc(S.profile.email||'')}</div></div>
+    <div class="field-row"><div class="field-label">Vybavuje</div><div class="field-value">${esc(creator.full_name||'')}</div></div>
+    <div class="field-row"><div class="field-label">Telefon</div><div class="field-value">${esc(creator.phone||'')}</div></div>
+    <div class="field-row"><div class="field-label">Email</div><div class="field-value">${esc(creator.email||'')}</div></div>
     <div class="field-row"><div class="field-label">IČO</div><div class="field-value">${esc(comp.ico)}</div></div>
     <div class="field-row"><div class="field-label">DIČ</div><div class="field-value">${esc(comp.dic)}</div></div>
   </div>
 </div>
 
-<div class="zakazka-line">${zakazkaHtml}</div>
 
 <div class="items-wrap">
   <div class="items-frame">
@@ -2304,12 +2499,15 @@ body{font-family:Calibri,Arial,sans-serif;font-size:11px;padding:12mm 15mm;displ
     </div>
     ${introText?`<div class="item-row text-row">${introText}</div>`:''}
     ${itemsHtml}
+    <div class="center-line">${zakazkaHtml}</div>
+    ${order.doprava?`<div class="center-line"><b>Spôsob dopravy: ${esc(order.doprava)}</b></div>`:''}
     ${(order.billing_note||order.attachment_note)?`<div class="billing-attach-block">
       ${order.billing_note?`<div>${esc(order.billing_note).replace(/\n/g,'<br/>')}</div>`:''}
       ${order.attachment_note?`<div>Prílohy: <b>${esc(order.attachment_note)}</b></div>`:''}
     </div>`:''}
     <div class="items-filler"></div>
     <div class="items-footnote">
+      ${vatRate?`Ceny sú uvedené bez DPH. DPH ${vatRate} % bude fakturovaná podľa platných predpisov.<br/>`:''}
       <b>Faktúru pošlite na adresu:</b> ${esc(comp.name)}, ${esc(comp.address)}, ${esc(comp.zip)} ${esc(comp.city)} &nbsp;|&nbsp; ${esc(comp.email)} &nbsp;|&nbsp; Splatnosť faktúry: ${dueDays} dní od dodania
     </div>
   </div>
@@ -2338,7 +2536,18 @@ body{font-family:Calibri,Arial,sans-serif;font-size:11px;padding:12mm 15mm;displ
   <div class="box appr-box" style="position:relative;">
     <div class="box-label">Schválenie</div>
     ${stampHtml}
-    <div class="appr-cols">
+    ${za5 ? `<div class="appr-cols">
+      <div class="appr-lvl">
+        <div class="lvl">Vystavil</div>
+        <div class="sign-line"></div>
+        <div class="sign-cap">${esc(creator.full_name||'')} – podpis, dátum</div>
+      </div>
+      <div class="appr-lvl">
+        <div class="lvl">Schválil – vedúci strediska</div>
+        <div class="sign-line"></div>
+        <div class="sign-cap">Meno, podpis, dátum</div>
+      </div>
+    </div>` : `<div class="appr-cols">
       <div class="appr-lvl">
         <div class="lvl">1. úroveň — vedúci strediska</div>
         ${sigL1Html}
@@ -2347,7 +2556,7 @@ body{font-family:Calibri,Arial,sans-serif;font-size:11px;padding:12mm 15mm;displ
         <div class="lvl">2. úroveň — riaditeľ</div>
         ${sigL2Html}
       </div>
-    </div>
+    </div>`}
   </div>
   <div class="right-col">
     <div class="meta-box">
@@ -2392,12 +2601,15 @@ async function startEdit(order, items) {
   const isCreator = order.created_by === S.profile.id;
   const isPendingApprover = order.pending_approver_id === S.profile.id;
   const myLevel = S.profile.approval_level || 0;
-  const canEdit = order.status === 'vystavena'
+  const canEdit = isZA5Mode()
+    ? (order.status === 'vystavena' && (isCreator || S.profile.is_admin))
+    : (order.status === 'vystavena'
     || (order.status === 'schvalena_L1' && isCreator && !order.pending_approver_id)
     || (order.status === 'caka_L1' && isPendingApprover)
     || (order.status === 'caka_L2' && isPendingApprover)
-    || (order.status === 'schvalena_L1' && myLevel === 2 && !isCreator);
+    || (order.status === 'schvalena_L1' && myLevel === 2 && !isCreator));
   if (!canEdit) {
+    if (isZA5Mode()) { alert('Editovať môže len vystavovateľ objednávky alebo administrátor.'); return; }
     alert('Editovať sa dá len objednávka v stave "Vystavená", vlastná objednávka vedúceho v stave "Schválená L1" kým ešte nebola odoslaná riaditeľovi, alebo objednávka, ktorá práve čaká na Vaše schválenie.');
     return;
   }
@@ -2426,7 +2638,8 @@ async function startEdit(order, items) {
   el('billing-note').value = order.billing_note||'';
   el('attachment-note').value = order.attachment_note||'';
   el('delivery-date').value = order.delivery_date||'';
-  el('delivery-date').min = order.order_date||today();
+  el('delivery-date').min = isZA5Mode() ? '' : (order.order_date||today());
+  applyZA5FormMode();
   el('doprava').value = order.doprava||'';
   el('sprava').value = order.sprava||'';
   el('note').value = order.note||'';
@@ -2482,7 +2695,7 @@ const STATUS_COLORS = {
 
 function renderStatusBadge(status) {
   const badge = el('view-status-badge');
-  badge.textContent = STATUS_LABELS[status] || status;
+  badge.textContent = (isZA5Mode() && status==='vystavena') ? 'Vystavená – tlač a ručný podpis' : (STATUS_LABELS[status] || status);
   badge.style.background = (STATUS_COLORS[status]||'#888') + '22';
   badge.style.color = STATUS_COLORS[status]||'#888';
   badge.style.border = '1px solid ' + (STATUS_COLORS[status]||'#888');
@@ -2553,6 +2766,17 @@ async function loadApprovalPanel(order) {
     || (status === 'caka_L2' && isPendingApprover)
     || (status === 'schvalena_L1' && myLevel === 2 && !isCreator);
   el('view-edit-btn').classList.toggle('hidden', !canEdit);
+
+  // Režim „len ZA5“: v systéme sa neschvaľuje, objednávka sa tlačí a podpisuje ručne.
+  if (isZA5Mode()) {
+    const canEditZA5 = status === 'vystavena' && (isCreator || S.profile.is_admin);
+    el('view-edit-btn').classList.toggle('hidden', !canEditZA5);
+    if (status === 'vystavena') {
+      el('approval-panel').insertAdjacentHTML('beforeend',
+        `<p id="ap-info-msg" style="font-size:13px;color:#2563a8;">🖨 Objednávka sa v systéme neschvaľuje – vytlačte ju (tlačidlo <b>Tlač / PDF</b>), dajte podpísať a pošlite dodávateľovi.</p>`);
+    }
+    return;
+  }
 
   // Panel logic
   if (status === 'vystavena' && isCreator) {
@@ -2861,6 +3085,11 @@ el('admin-btn').addEventListener('click', async () => {
 });
 
 function renderSystemSettings() {
+  const za = el('setting-rezim-za5');
+  za.checked = isZA5Mode();
+  el('setting-rezim-za5-hint').textContent = za.checked
+    ? 'Zapnuté - objednávky môžu vystavovať len používatelia strediska ZA5, neposielajú sa na schválenie, na tlači sú prázdne riadky na ručný podpis.'
+    : 'Vypnuté - plný schvaľovací proces L1 (vedúci) → L2 (riaditeľ) pre všetky strediská.';
   const cb = el('setting-emails-enabled');
   cb.checked = emailsEnabled();
   el('setting-emails-hint').textContent = cb.checked
@@ -2881,6 +3110,41 @@ el('setting-emails-enabled').addEventListener('change', async function() {
   }
   S.settings.emails_enabled = val;
   renderSystemSettings();
+});
+
+el('setting-rezim-za5').addEventListener('change', async function() {
+  const val = this.checked ? 'true' : 'false';
+  if (!confirm(this.checked
+      ? 'Zapnúť režim „len ZA5“? Objednávky sa prestanú schvaľovať v systéme a vystavovať ich budú môcť len používatelia strediska ZA5.'
+      : 'Vypnúť režim „len ZA5“? Zapne sa plný schvaľovací proces L1 → L2 pre všetky strediská.')) {
+    this.checked = !this.checked; return;
+  }
+  this.disabled = true;
+  const {error} = await supabaseClient.from('app_settings')
+    .upsert({key:'rezim_len_za5', value:val}, {onConflict:'key'});
+  this.disabled = false;
+  if (error) {
+    alert('Nepodarilo sa uložiť nastavenie: '+error.message);
+    this.checked = !this.checked;
+    return;
+  }
+  S.settings.rezim_len_za5 = val;
+  renderSystemSettings();
+});
+
+// Náhľad čísla ďalšej objednávky vo formulári používateľa
+function updateNumberPreview() {
+  const init = el('af-initials').value.trim().toUpperCase();
+  const str = el('af-stredisko').value;
+  const n = parseInt(el('af-last-number').value, 10);
+  const year = new Date().getFullYear();
+  el('af-number-preview').textContent = (init && str)
+    ? 'Ďalšia objednávka dostane číslo: ' + ((isNaN(n)?0:n)+1) + '/' + str + init + '/' + year
+    : '';
+}
+['af-initials','af-stredisko','af-last-number'].forEach(id => {
+  el(id).addEventListener('input', updateNumberPreview);
+  el(id).addEventListener('change', updateNumberPreview);
 });
 
 async function loadAdminUserList() {
@@ -2969,7 +3233,12 @@ el('admin-add-btn').addEventListener('click', () => {
   el('af-email').value = '';
   el('af-password').value = '';
   el('af-initials').value = '';
-  el('af-stredisko').value = '';
+  el('af-stredisko').value = 'ZA5';
+  el('af-counter-year').textContent = new Date().getFullYear();
+  el('af-last-number').value = '0';
+  el('af-last-number').disabled = false;
+  S.editingUserCounter = null;
+  updateNumberPreview();
   el('af-phone').value = '';
   el('af-approval-level').value = '0';
   el('af-is-admin').checked = false;
@@ -3013,6 +3282,19 @@ window.openEditUser = function(userId) {
   el('af-password').value = '';
   el('af-initials').value = u.initials;
   el('af-stredisko').value = u.stredisko_kod || '';
+  const cy = new Date().getFullYear();
+  el('af-counter-year').textContent = cy;
+  el('af-last-number').value = '';
+  el('af-last-number').disabled = true;
+  S.editingUserCounter = null;
+  el('af-number-preview').textContent = 'Načítavam číslovanie...';
+  callManageUsers({ action:'get_order_counter', user_id:userId, year:cy }).then(r => {
+    if (S.editingUserId !== userId) return;          // medzitým otvorený iný používateľ
+    el('af-last-number').disabled = false;
+    if (r.ok) { S.editingUserCounter = r.last_number||0; el('af-last-number').value = String(S.editingUserCounter); }
+    else { el('af-number-preview').textContent = 'Číslovanie sa nepodarilo načítať: '+(r.error||''); return; }
+    updateNumberPreview();
+  });
   el('af-phone').value = u.phone||'';
   el('af-approval-level').value = String(u.approval_level||0);
   el('af-is-admin').checked = !!u.is_admin;
@@ -3045,6 +3327,21 @@ el('af-save-btn').addEventListener('click', async () => {
 
   if (!name || !email || !init) {
     el('admin-error').textContent = 'Vyplňte aspoň Meno, Email a Iniciály.';
+    el('admin-error').classList.remove('hidden'); return;
+  }
+  if (!/^[A-Z]{1,4}$/.test(init)) {
+    el('admin-error').textContent = 'Iniciály môžu obsahovať len 1–4 písmená A–Z bez diakritiky (idú do čísla objednávky, napr. 245/ZA5JV/2026).';
+    el('admin-error').classList.remove('hidden'); return;
+  }
+  const dupInit = (S.adminUsers||[]).find(u => u.id !== S.editingUserId && u.initials === init && u.stredisko_kod === stredKod);
+  if (dupInit) {
+    el('admin-error').textContent = 'Iniciály '+init+' už má na stredisku '+stredKod+' používateľ '+dupInit.full_name+' – čísla objednávok by sa zhodovali. Zvoľte iné (napr. 3 písmená).';
+    el('admin-error').classList.remove('hidden'); return;
+  }
+  const lastNumRaw = el('af-last-number').value.trim();
+  const lastNum = lastNumRaw === '' ? null : Number(lastNumRaw);
+  if (lastNum !== null && (!Number.isInteger(lastNum) || lastNum < 0)) {
+    el('admin-error').textContent = 'Posledné použité číslo musí byť celé nezáporné číslo.';
     el('admin-error').classList.remove('hidden'); return;
   }
   if (!stredKod) {
@@ -3084,7 +3381,16 @@ el('af-save-btn').addEventListener('click', async () => {
   el('admin-form-wrap').classList.add('hidden');
   const wasEditingId = S.editingUserId;
   S.editingUserId = null;
-  alert(result.message || 'Hotovo.');
+
+  // Číslovanie objednávok (posledné použité číslo v aktuálnom roku)
+  const counterUserId = wasEditingId || result.user_id;
+  let counterMsg = '';
+  const counterChanged = lastNum !== null && (wasEditingId ? (S.editingUserCounter !== null && lastNum !== S.editingUserCounter) : lastNum > 0);
+  if (counterUserId && counterChanged) {
+    const cr = await callManageUsers({ action:'set_order_counter', user_id:counterUserId, year:new Date().getFullYear(), last_number:lastNum });
+    counterMsg = cr.ok ? '\n' + (cr.message||'') : '\n⚠ Číslovanie sa NEPODARILO nastaviť: ' + (cr.error||'') + ' – nastavte ho tlačidlom 🔢 Číslovanie.';
+  }
+  alert((result.message || 'Hotovo.') + counterMsg);
   await loadAdminUserList();
   // Obnov zoznam profilov pre schvaľovanie
   S.profiles = null;
