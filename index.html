@@ -450,6 +450,11 @@ td.total-cell{text-align:right;font-weight:600;white-space:nowrap;}
                 <div id="supplier-results" class="autocomplete-dropdown hidden"></div>
               </div>
               <div class="field-error" id="err-supplier"></div>
+              <div id="supplier-fill" class="hidden" style="border:1px solid #f0c36d;background:#fffaf0;border-radius:var(--radius);padding:10px 12px;margin-top:8px;">
+                <div style="font-size:13px;margin-bottom:8px;">ℹ <b>Pri tomto dodávateľovi chýbajú niektoré údaje.</b> Ak ich poznáte, doplňte ich – uložia sa do databázy dodávateľov (pre všetkých) a vytlačia sa aj na tejto objednávke. Nepovinné – prázdne polia sa ignorujú.</div>
+                <div class="form-grid" id="supplier-fill-fields"></div>
+                <div class="field-error" id="err-supplier-fill"></div>
+              </div>
               <label style="margin-top:6px;font-weight:400;color:var(--text);">
                 <input type="checkbox" id="new-supplier-toggle" style="width:auto;"/>
                 Dodávateľ nie je v zozname – zadať nového
@@ -1494,6 +1499,7 @@ function buildForm(tpl) {
   ['err-order-date','err-zakazka','err-supplier','err-new-supplier','err-items','err-delivery-date'].forEach(id=>setErr(id,''));
   el('zakazka-input').value=''; el('zakazka-input').classList.remove('invalid');
   el('supplier-input').value=''; el('supplier-input').classList.remove('invalid');
+  showSupplierFill(null);
   el('new-supplier-toggle').checked=false;
   el('new-supplier-fields').classList.add('hidden');
   el('supplier-input').disabled=false;
@@ -1624,6 +1630,7 @@ function renderSupplierResults(results, q) {
       el('supplier-input').value = lbl;
       hideSupplierResults();
       el('supplier-input').classList.remove('invalid'); setErr('err-supplier','');
+      showSupplierFill(S.supplierMap.get(lbl));
     });
   });
 }
@@ -1633,11 +1640,66 @@ function hideSupplierResults() {
 }
 el('supplier-input').addEventListener('input', () => {
   el('supplier-input').classList.remove('invalid'); setErr('err-supplier','');
+  showSupplierFill(S.supplierMap.get(el('supplier-input').value.trim()) || null);
   scheduleSupplierSearch(el('supplier-input').value);
 });
 document.addEventListener('click', e => {
   if (!el('supplier-input').contains(e.target) && !el('supplier-results').contains(e.target)) hideSupplierResults();
 });
+
+// ── DOPLNENIE CHÝBAJÚCICH ÚDAJOV DODÁVATEĽA (môže každý vystavovateľ) ─────
+// Ponúknu sa len PRÁZDNE nepovinné polia. Do databázy sa zapíše hodnota len
+// tam, kde je pole stále prázdne - existujúce údaje sa nikdy neprepíšu
+// (opravu existujúcich údajov robí admin cez "Opraviť dodávateľa").
+const SUPPLIER_FILL_FIELDS = [
+  ['contact_person','Kontaktná osoba (Vybavuje)','napr. Ing. Jana Turčáková'],
+  ['phone','Telefón','napr. 041 4233268'],
+  ['email','Email','napr. objednavky@firma.sk'],
+  ['zip','PSČ','napr. 023 35'],
+  ['dic','DIČ','napr. 2021790111'],
+];
+const isBlank = v => v===null || v===undefined || String(v).trim()==='';
+function showSupplierFill(sup) {
+  const box = el('supplier-fill');
+  setErr('err-supplier-fill','');
+  const missing = sup && sup.id ? SUPPLIER_FILL_FIELDS.filter(([f]) => isBlank(sup[f])) : [];
+  if (!missing.length) { box.classList.add('hidden'); el('supplier-fill-fields').innerHTML=''; box.dataset.sid=''; return; }
+  if (box.dataset.sid === sup.id && !box.classList.contains('hidden')) return; // už zobrazené, nemaž rozpísané
+  box.dataset.sid = sup.id;
+  el('supplier-fill-fields').innerHTML = missing.map(([f,l,ph]) =>
+    `<div><label>${esc(l)}</label><input data-fill="${f}" placeholder="${esc(ph)}" autocomplete="off"/></div>`).join('');
+  box.classList.remove('hidden');
+}
+// Validácia a zber vyplnených hodnôt; vracia {vals, error}
+function readSupplierFill() {
+  const vals = {};
+  if (el('supplier-fill').classList.contains('hidden')) return {vals};
+  el('supplier-fill-fields').querySelectorAll('input[data-fill]').forEach(i => {
+    const v = i.value.trim().replace(/\s+/g,' ');
+    if (v) vals[i.dataset.fill] = v;
+  });
+  if (vals.email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(vals.email)) return {vals, error:'Email dodávateľa nemá správny tvar.'};
+  if (vals.phone && !/^[+0-9 ()\/-]{6,20}$/.test(vals.phone)) return {vals, error:'Telefón môže obsahovať len číslice, medzery a znaky + ( ) / - (6–20 znakov).'};
+  if (vals.zip && !/^[0-9 ]{3,10}$/.test(vals.zip)) return {vals, error:'PSČ môže obsahovať len číslice a medzery.'};
+  return {vals};
+}
+// Zapíše doplnené údaje do databázy (len do prázdnych polí) a vráti dodávateľa
+// s doplnenými údajmi pre snapshot objednávky.
+async function saveSupplierFill(supplier, vals) {
+  const keys = Object.keys(vals||{});
+  if (!supplier?.id || !keys.length) return supplier;
+  for (const f of keys) {
+    const {error} = await supabaseClient.from('suppliers')
+      .update({[f]: vals[f]}).eq('id', supplier.id).or(`${f}.is.null,${f}.eq.`);
+    if (error) console.warn('Doplnenie dodávateľa ('+f+') zlyhalo:', error.message);
+  }
+  const {data: fresh} = await supabaseClient.from('suppliers').select('*').eq('id', supplier.id).maybeSingle();
+  const merged = {...supplier, ...(fresh||{})};
+  keys.forEach(f => { if (isBlank(merged[f])) merged[f] = vals[f]; }); // aspoň na objednávku
+  S.supplierMap.set(supplierLabel(merged), merged);
+  el('supplier-fill').classList.add('hidden'); el('supplier-fill').dataset.sid='';
+  return merged;
+}
 
 // Prednačíta konkrétneho dodávateľa (podľa id) do vyhľadávacej mapy - používa sa
 // pri editácii/klonovaní objednávky, aby validácia pri uložení fungovala aj bez
@@ -1649,6 +1711,7 @@ async function preloadSupplierForEdit(supplierId, fallbackSnapshot) {
   if (!s) return '';
   const lbl = supplierLabel(s);
   if (data) S.supplierMap.set(lbl, data);
+  showSupplierFill(data || null);
   return lbl;
 }
 
@@ -1721,7 +1784,7 @@ async function resolveZakazka(raw) {
 
 el('zakazka-input').addEventListener('input',()=>{el('zakazka-input').classList.remove('invalid');setErr('err-zakazka','');});
 el('new-supplier-toggle').addEventListener('change',e=>{
-  if(e.target.checked){el('new-supplier-fields').classList.remove('hidden');el('supplier-input').disabled=true;el('supplier-input').value='';hideSupplierResults();}
+  if(e.target.checked){el('new-supplier-fields').classList.remove('hidden');el('supplier-input').disabled=true;el('supplier-input').value='';hideSupplierResults();showSupplierFill(null);}
   else{el('new-supplier-fields').classList.add('hidden');el('supplier-input').disabled=false;}
 });
 
@@ -1823,6 +1886,8 @@ el('order-form').addEventListener('submit', async e => {
     supplier=S.supplierMap.get(el('supplier-input').value.trim());
     if(!supplier){el('supplier-input').classList.add('invalid');setErr('err-supplier','Vyberte dodávateľa zo zoznamu.');ok=false;}
   }
+  const supFill = isNew ? {vals:{}} : readSupplierFill();
+  if(supFill.error){setErr('err-supplier-fill',supFill.error);ok=false;} else setErr('err-supplier-fill','');
 
   const items=[]; let hasDesc=false;
   document.querySelectorAll('#items-body tr').forEach(tr=>{
@@ -1862,6 +1927,7 @@ el('order-form').addEventListener('submit', async e => {
       let zakazka;
       try { zakazka = await resolveZakazka(zakazkaRaw); }
       catch(ze){ el('form-error').textContent='Chyba pri zákazke: '+ze.message; el('form-error').classList.remove('hidden'); el('submit-btn').disabled=false; return; }
+      if(!isNew) supplier = await saveSupplierFill(supplier, supFill.vals);
       const snap={name:supplier.name,address:supplier.address,zip:supplier.zip,city:supplier.city,
         ico:supplier.ico,dic:supplier.dic,contact_person:supplier.contact_person,phone:supplier.phone,email:supplier.email};
       rememberAttachmentOption(el('attachment-note').value.trim());
@@ -1919,6 +1985,7 @@ el('order-form').addEventListener('submit', async e => {
     let zakazka;
     try { zakazka = await resolveZakazka(zakazkaRaw); }
     catch(ze){ el('form-error').textContent='Chyba pri zákazke: '+ze.message; el('form-error').classList.remove('hidden'); el('submit-btn').disabled=false; return; }
+    if(!isNew) supplier = await saveSupplierFill(supplier, supFill.vals);
     const snap={name:supplier.name,address:supplier.address,zip:supplier.zip,city:supplier.city,
       ico:supplier.ico,dic:supplier.dic,contact_person:supplier.contact_person,
       phone:supplier.phone,email:supplier.email};
